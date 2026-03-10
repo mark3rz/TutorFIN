@@ -1,0 +1,23 @@
+Build the first version of the Fixed Income module.
+
+Tasks:
+1. Implement zero coupon bond pricing
+2. Implement coupon bond pricing
+3. Implement accrued interest, clean price, and dirty price
+4. Implement yield to maturity
+5. Implement Macaulay duration, modified duration, and convexity
+6. Add tests for standard bond math and price yield relationships
+7. Add frontend inputs, outputs, and charts for:
+   - cash flow schedules
+   - price versus yield
+   - duration and convexity sensitivity
+8. Add theory panels for:
+   - discounting
+   - no arbitrage basics
+   - the relationship between rates and bond prices
+   - duration and convexity intuition
+
+Requirements:
+- make conventions explicit
+- keep cash flow scheduling auditable
+- maintain backend first quant logic

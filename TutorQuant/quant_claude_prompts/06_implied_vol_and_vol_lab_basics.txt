@@ -1,0 +1,22 @@
+Build the first version of the Volatility Lab module.
+
+Tasks:
+1. Implement an implied volatility solver for European options under BSM
+2. Validate arbitrage bounds before inversion
+3. Return solver diagnostics and failure states cleanly
+4. Add frontend tools for:
+   - entering an observed option price and solving implied vol
+   - comparing implied vol to user supplied historical vol or EWMA vol
+5. Build smile and skew visualizations from demo option chain data
+6. Add term structure visualizations from demo data
+7. Structure payloads for a future 3D surface view
+8. Add theory panels that explain:
+   - implied versus realized volatility
+   - smile and skew
+   - where constant volatility breaks down
+   - why traders care about term structure
+
+Requirements:
+- keep observed versus interpolated values clearly labeled
+- do not overbuild GARCH in this phase
+- focus on clean architecture and strong explanatory quality

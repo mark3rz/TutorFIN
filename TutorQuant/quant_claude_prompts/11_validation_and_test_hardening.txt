@@ -1,0 +1,22 @@
+Now harden the platform’s validation and testing.
+
+Scope for this stage:
+- Test audit
+- Numerical validation audit
+- Regression tests
+- Input validation and error-state hardening
+
+Requirements:
+- Review all implemented modules and identify weak validation points.
+- Add missing benchmark tests for pricing engines.
+- Add regression tests for critical endpoints and utilities.
+- Tighten input validation and user-facing error messages.
+- Review numerical stability issues such as invalid parameters, failed solvers, unstable root finding, or pathological simulation states.
+- Document acceptable tolerances and known approximation regions.
+- Produce a concise validation summary.
+
+Output format:
+1. Validation gaps found
+2. Test and hardening work completed
+3. Key numerical safeguards added
+4. Remaining known risk areas

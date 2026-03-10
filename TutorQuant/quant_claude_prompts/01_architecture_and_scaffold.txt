@@ -1,0 +1,42 @@
+You are building a production-quality quant dashboard with a Bloomberg Terminal feel and a rigorous teaching layer.
+
+Task for this stage:
+Design and implement only the core architecture and app scaffold.
+Do not yet build the full pricing functionality beyond what is needed for a skeleton.
+
+Requirements:
+- Propose the folder structure for a Next.js + React + TypeScript frontend and a Python FastAPI backend.
+- Propose the page/module architecture for:
+  - Option Modeling
+  - Volatility Lab
+  - Greeks and P&L
+  - Portfolio Pricing
+  - Fixed Income
+  - Interest Rate Models
+  - Swaps
+  - Model Encyclopedia / Theory
+- Implement the shared app shell with:
+  - left sidebar navigation
+  - top sub-tab pattern
+  - dark Bloomberg-inspired terminal theme
+  - main chart area placeholder
+  - right-side formula/assumptions/theory placeholder panel
+- Create typed frontend models and backend schemas for:
+  - instruments
+  - pricing requests
+  - pricing responses
+  - simulation outputs
+  - Greeks outputs
+  - portfolio position and portfolio summary
+  - bond pricing requests/responses
+  - rate model requests/responses
+- Implement a backend registry or architecture pattern that cleanly separates instruments, models, and services.
+- Add demo data scaffolding and market-data adapter interfaces, but do not yet connect live APIs.
+- Add testing scaffolding.
+
+Output format:
+1. Architecture summary
+2. Folder structure
+3. Key schema definitions
+4. Implement scaffold code
+5. Explain major architectural decisions briefly

@@ -1,0 +1,16 @@
+Recommended run order
+
+01_architecture_and_scaffold.txt
+02_phase1_shell_bsm_greeks_mc.txt
+03_phase1_formula_derivation_panels.txt
+04_phase2_trees_pnl_portfolio_var_es.txt
+05_phase2_volatility_lab_iv_smile_surface.txt
+06_phase3_fixed_income_curves_bonds.txt
+07_phase3_rate_models.txt
+08_phase4_swaps_module.txt
+09_phase4_calibration_scaffolding.txt
+10_phase4_model_encyclopedia_and_comparison.txt
+11_validation_and_test_hardening.txt
+12_ui_polish_and_terminal_consistency.txt
+
+Run one prompt at a time. Commit or checkpoint after each successful stage.

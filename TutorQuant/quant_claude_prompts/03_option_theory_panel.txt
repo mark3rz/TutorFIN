@@ -1,0 +1,24 @@
+Build the theory and formula experience for the Black Scholes Merton module.
+
+Tasks:
+1. Create a prominent formula panel with LaTeX rendering
+2. Add parameter definition cards
+3. Add a structured derivation panel that explains at MSc quant finance level:
+   - underlying GBM process
+   - risk neutral valuation intuition
+   - the role of hedging
+   - the PDE connection
+   - the closed form solution context
+4. Add assumptions, fragility warnings, and "why desks use this model"
+5. Add term definition tooltips for major quant terms
+6. Connect all content to the BSM pricing API outputs without embedding pricing logic in the frontend
+
+Requirements:
+- professional tone
+- mathematically rigorous but readable
+- no shallow textbook filler
+- derivation should be structured, not a wall of text
+- formulas should feel central to the page, not buried
+
+Do not implement other models here.
+Polish the theory layer for BSM only.

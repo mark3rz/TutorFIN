@@ -1,0 +1,20 @@
+Build the first version of the Swaps module.
+
+Tasks:
+1. Implement vanilla fixed for floating interest rate swap cash flow structure
+2. Add the concept layer and architecture for:
+   - basis swaps
+   - OIS discounting
+   - cross currency swaps
+3. Where feasible, implement par swap rate logic and basic sensitivity outputs
+4. Add frontend views for:
+   - leg cash flows
+   - timeline structure
+   - discounting intuition
+   - sensitivity summaries
+5. Add theory panels explaining market conventions and desk usage
+
+Requirements:
+- swaptions are out of scope for this phase
+- prioritize clean structure and educational clarity
+- document what is fully implemented versus conceptual architecture

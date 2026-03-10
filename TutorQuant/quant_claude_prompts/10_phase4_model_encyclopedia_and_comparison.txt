@@ -1,0 +1,28 @@
+Build the Model Encyclopedia and advanced comparison layer.
+
+Scope for this stage:
+- Central model encyclopedia page
+- Cross-model comparison framework
+- Why desks use this model panel
+- Failure modes and fragility warnings
+
+Requirements:
+- Build a theory-first encyclopedia page covering the major models in the platform.
+- For each model, present:
+  - formula or process
+  - assumptions
+  - suitable instruments
+  - strengths
+  - weaknesses
+  - calibration burden
+  - computational cost
+  - typical desk usage
+- Add model comparison views that help users understand when to choose one model over another.
+- Keep the content rigorous and consistent with the formulas implemented elsewhere.
+- Reuse the theory and pedagogy architecture instead of duplicating content.
+
+Output format:
+1. Encyclopedia structure
+2. Comparison framework
+3. UI/content implementation
+4. Notes on consistency with implemented pricing engines

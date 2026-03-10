@@ -1,0 +1,35 @@
+Build Phase 1 of the quant dashboard.
+
+Scope for this stage only:
+- Option Modeling page for European equity options under Black-Scholes-Merton
+- Closed-form Greeks
+- Payoff diagrams
+- GBM Monte Carlo simulation engine
+- Backend pricing endpoints and frontend integration for this scope
+
+Requirements:
+- Implement Black-Scholes-Merton pricing for European call and put options.
+- Implement analytical Delta, Gamma, Vega, Theta, and Rho.
+- Add payoff chart support for long/short calls and puts.
+- Implement GBM Monte Carlo path simulation with:
+  - default 1000 paths
+  - user-selectable random seed
+  - confidence intervals
+  - convergence diagnostics
+  - antithetic variates if cleanly feasible
+- Show outputs in the UI:
+  - scalar price and Greeks
+  - payoff chart
+  - simulated path fan
+  - terminal distribution histogram
+  - convergence chart
+- Build only what is needed for this Phase 1 scope.
+- Keep all quantitative conventions explicit.
+- Add backend tests benchmarking BSM prices and Greeks against reference values.
+
+Output format:
+1. What is being implemented in this phase
+2. Quant assumptions and formulas used
+3. Code changes
+4. Tests added
+5. Notes on extensibility for later models

@@ -1,0 +1,26 @@
+Build the first version of calibration scaffolding and the model encyclopedia layer.
+
+Tasks:
+1. Create a clean calibration architecture that separates:
+   - normalized market inputs
+   - objective functions
+   - parameter bounds
+   - solver outputs
+   - diagnostics
+2. Implement at least one working reference calibration workflow if it can be done cleanly within current scope
+3. Add UI surfaces for calibration diagnostics and fitted parameters
+4. Build a model encyclopedia or comparison layer that summarizes, for each major model:
+   - assumptions
+   - mathematical structure
+   - calibration burden
+   - computational cost
+   - strengths
+   - weaknesses
+   - desk usage
+   - failure modes
+5. Ensure all module pages can link into the model encyclopedia content
+
+Requirements:
+- do not destabilize the core pricing engine
+- failed calibration should be informative
+- keep this phase as a foundation for later expansion, not an oversized final system

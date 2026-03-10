@@ -1,0 +1,27 @@
+Implement the Monte Carlo GBM simulation engine for European options and the associated visual outputs.
+
+Tasks:
+1. Implement GBM path simulation under the risk neutral measure
+2. Support user controlled random seed
+3. Default to 1000 paths
+4. Include confidence intervals
+5. Include convergence diagnostics
+6. Enable antithetic variates by default where straightforward
+7. Support backend payloads for:
+   - representative sample paths
+   - path fan chart
+   - terminal stock distribution
+   - terminal payoff distribution
+   - convergence versus number of paths
+8. Add backend tests for reproducibility and convergence behavior
+9. Add frontend simulation views and charts in the Option Modeling module
+10. Clearly explain simulation assumptions and noise limitations
+
+Requirements:
+- separate path generation from payoff evaluation
+- return diagnostics and warnings
+- use the existing app architecture cleanly
+- compare Monte Carlo price to closed form BSM where appropriate
+
+Do not add exotic options yet.
+Keep scope to European options with GBM.

@@ -1,0 +1,21 @@
+Perform final UI and UX polish for terminal consistency.
+
+Scope for this stage:
+- Consistent Bloomberg-style visual language
+- Component polish
+- Dense-layout improvements
+- Usability checks for formula and chart workflows
+
+Requirements:
+- Review all pages for consistency in dark theme, spacing, data density, and panel hierarchy.
+- Ensure the central chart area remains dominant.
+- Standardize cards, tabs, tables, status banners, assumptions panels, and warning treatments.
+- Ensure formulas, derivations, assumptions, diagnostics, and market-use sections feel coherent across modules.
+- Add or refine tooltips for quant terms.
+- Keep the interface professional and serious, not consumer-app-like.
+- Do not weaken quantitative clarity for style.
+
+Output format:
+1. UI inconsistencies found
+2. Design refinements made
+3. Notes on remaining polish ideas for future versions

@@ -1,0 +1,33 @@
+Build the Volatility Lab module.
+
+Scope for this stage:
+- Historical volatility
+- EWMA volatility
+- Implied volatility solver
+- Smile/skew charts
+- Term structure charts
+- 3D implied volatility surface
+- Realized vs implied volatility comparison
+- VIX conceptual layer
+
+Requirements:
+- Implement historical volatility calculations with explicit annualization assumptions.
+- Implement EWMA volatility.
+- Build a robust implied-volatility solver for vanilla options.
+- Create smile/skew plots by maturity.
+- Create a 3D implied-volatility surface component from normalized option-chain-style inputs.
+- Build a realized vs implied volatility comparison view.
+- Add theory content explaining:
+  - constant-vol limitations
+  - why smile/skew exists
+  - why term structure matters
+  - what VIX represents conceptually
+- Keep architecture ready for local vol, stochastic vol, and calibration in later stages.
+- Add tests for the IV solver and volatility utilities.
+
+Output format:
+1. Scope delivered
+2. Volatility conventions
+3. Code changes
+4. Tests added
+5. Extension hooks for later advanced vol models

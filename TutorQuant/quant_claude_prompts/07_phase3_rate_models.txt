@@ -1,0 +1,30 @@
+Build the Interest Rate Models module.
+
+Scope for this stage:
+- Vasicek
+- CIR
+- Hull-White
+- Model comparison layer
+- Short-rate simulation visuals
+- Bond-price implication views
+
+Requirements:
+- Implement the short-rate process definitions and simulation engines for Vasicek, CIR, and Hull-White.
+- Show parameter definitions and assumptions clearly.
+- Add simulated short-rate path charts.
+- Show qualitative or quantitative bond-price implications from simulated rates.
+- Add a comparison table explaining:
+  - mean reversion
+  - positivity behavior
+  - practical intuition
+  - common use cases
+  - limitations
+- Add theory panels for each model.
+- Add tests for process simulation sanity and core utilities.
+
+Output format:
+1. Scope delivered
+2. Model assumptions
+3. Code changes
+4. Tests added
+5. Future extension notes

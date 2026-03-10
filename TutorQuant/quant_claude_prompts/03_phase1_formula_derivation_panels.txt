@@ -1,0 +1,34 @@
+Extend Phase 1 by building the theory and derivation presentation layer for the Black-Scholes-Merton module.
+
+Scope for this stage:
+- Formula panel
+- Derivation panel
+- Assumptions and limitations panel
+- Practical market-use panel
+- Symbol definitions
+
+Requirements:
+- Render BSM formulas cleanly with KaTeX or MathJax.
+- Show the GBM stock process and define every symbol.
+- Present a readable derivation path at MSc Quant Finance depth covering:
+  - geometric Brownian motion setup
+  - self-financing hedge intuition
+  - Black-Scholes PDE
+  - risk-neutral pricing interpretation
+  - closed-form option price result
+- Add a panel explaining assumptions:
+  - lognormal dynamics
+  - constant volatility
+  - constant rates
+  - frictionless trading assumptions
+- Add a panel on practical market use:
+  - why desks still use BSM
+  - where it breaks
+  - why implied volatility is used in practice
+- Keep the math prominent, readable, and structured.
+
+Output format:
+1. Theory content architecture
+2. UI component structure
+3. Rendered math implementation
+4. Brief explanation of content choices

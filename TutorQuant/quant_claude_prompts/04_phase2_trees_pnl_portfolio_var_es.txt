@@ -1,0 +1,27 @@
+Build the next module set after Phase 1.
+
+Scope for this stage:
+- Binomial and trinomial option pricing
+- P&L explain basics
+- Portfolio pricing basics
+- Portfolio Greeks aggregation
+- VaR and Expected Shortfall basics
+- Discrete hedging error illustration with transaction cost input
+
+Requirements:
+- Add binomial and trinomial models for appropriate option types.
+- Restrict model selection to appropriate instruments.
+- Build a model comparison panel for BSM vs tree models.
+- Add portfolio position input and aggregated valuation.
+- Aggregate Greeks across positions.
+- Add scenario-shock views and a Greek-based P&L explain panel.
+- Add basic VaR and Expected Shortfall views for the portfolio.
+- Add a simplified discrete hedging error demonstration with user-input transaction cost.
+- Add tests for tree models and portfolio aggregation logic.
+
+Output format:
+1. Scope delivered
+2. Quant methodology choices
+3. Code changes
+4. Test coverage added
+5. Known limitations reserved for later phases

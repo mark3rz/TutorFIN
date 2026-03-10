@@ -1,0 +1,27 @@
+Build the Fixed Income module.
+
+Scope for this stage:
+- Zero-coupon bond pricing
+- Coupon bond pricing
+- Accrued interest
+- Clean and dirty price
+- Yield to maturity
+- Duration and convexity
+- Discount-factor term structure and bootstrapping foundations
+
+Requirements:
+- Implement bond-pricing utilities and cash-flow schedule generation.
+- Support clean price, dirty price, and accrued interest clearly.
+- Compute yield to maturity, duration, and convexity.
+- Add discounting and no-arbitrage explanation panels.
+- Add curve and discount-factor visualizations.
+- Add price/yield sensitivity charts.
+- Add tests for bond pricing, accrued-interest logic, duration, and convexity.
+- Keep day-count and compounding assumptions explicit.
+
+Output format:
+1. Scope delivered
+2. Quant conventions and assumptions
+3. Code changes
+4. Tests added
+5. Notes for curve-bootstrapping extensions

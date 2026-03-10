@@ -1,0 +1,23 @@
+Build calibration scaffolding for the platform.
+
+Scope for this stage:
+- Calibration architecture
+- One reference calibration example
+- Error metrics and diagnostics
+- Parameter constraints
+
+Requirements:
+- Separate calibration logic from pricing logic.
+- Design interfaces for calibrating volatility models to option-chain-style inputs.
+- Design interfaces for curve fitting / bootstrapping workflows in rates.
+- Implement at least one working reference calibration example, such as an implied-volatility surface fitting workflow or simple stochastic-vol parameter calibration placeholder with realistic structure.
+- Expose calibration diagnostics and fit errors.
+- Document objective-function choices and parameter constraints.
+- Add tests for calibration helpers where reasonable.
+
+Output format:
+1. Calibration architecture
+2. Reference example implemented
+3. Diagnostics and error reporting
+4. Tests added
+5. Extension notes for future production calibration

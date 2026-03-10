@@ -1,0 +1,30 @@
+Implement Phase 1 quantitative core for the Option Modeling module.
+
+Tasks:
+1. Implement Black Scholes Merton pricing for European calls and puts
+2. Implement closed form Greeks:
+   - Delta
+   - Gamma
+   - Vega
+   - Theta
+   - Rho
+3. Create typed request and response schemas
+4. Add backend API endpoints for pricing and Greeks
+5. Add unit tests and benchmark tests against known values
+6. Add frontend input form and result panels
+7. Add clear diagnostics and input validation
+8. Return metadata needed for the theory panel:
+   - formula
+   - assumptions
+   - parameter definitions
+   - limitations
+   - why desks use this model
+
+Requirements:
+- use explicit conventions
+- document annualization assumptions
+- expose warnings cleanly
+- keep the implementation modular so additional models can slot in later
+
+Do not implement implied vol, Monte Carlo, or other models in this prompt.
+Focus only on a clean BSM foundation.

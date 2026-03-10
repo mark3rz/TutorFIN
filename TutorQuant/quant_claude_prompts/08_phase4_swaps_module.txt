@@ -1,0 +1,24 @@
+Build the Swaps module.
+
+Scope for this stage:
+- Fixed-for-floating vanilla interest rate swaps
+- Basis swaps conceptually or structurally if feasible
+- OIS discounting concepts
+- Cross-currency swaps conceptual architecture
+- Par swap rate explanation
+
+Requirements:
+- Implement vanilla IRS cash-flow and valuation foundations.
+- Show fixed leg and floating leg logic clearly.
+- Add par swap rate explanation and computation where feasible.
+- Include sensitivity-style outputs if practical.
+- Add theory panels on discounting logic, market conventions, and OIS concepts.
+- Keep cross-currency and basis swaps at least architecturally represented, even if not fully built.
+- Add tests for core swap valuation utilities.
+
+Output format:
+1. Scope delivered
+2. Quant conventions
+3. Code changes
+4. Tests added
+5. Remaining future work

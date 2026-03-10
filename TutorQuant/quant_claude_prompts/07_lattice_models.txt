@@ -1,0 +1,20 @@
+Add lattice based pricing to the Option Modeling module.
+
+Tasks:
+1. Implement binomial tree pricing for European and American vanilla options
+2. Implement trinomial tree pricing for appropriate vanilla cases
+3. Add API endpoints and typed schemas
+4. Add benchmark tests against BSM for European cases where appropriate
+5. Add frontend views for:
+   - selecting lattice model
+   - visualizing tree assumptions and convergence behavior
+   - comparing lattice outputs to BSM for suitable cases
+6. Add theory content explaining:
+   - intuition of lattice models
+   - early exercise logic
+   - strengths and weaknesses versus closed form and Monte Carlo
+
+Requirements:
+- keep lattice logic modular
+- make step count and convergence assumptions explicit
+- clearly label which instruments and exercise styles each model supports

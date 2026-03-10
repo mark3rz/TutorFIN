@@ -1,0 +1,21 @@
+Extend the Option Modeling module with payoff, P&L, and richer Greeks views.
+
+Tasks:
+1. Add payoff diagrams for long and short calls and puts
+2. Add scenario based deterministic P&L views under shocked spot, volatility, rates, and time
+3. Add Greek display modes:
+   - scalar cards
+   - heatmaps
+   - surfaces where appropriate
+4. Add Greek based P&L explain for simple scenarios
+5. Add transaction cost input support for demonstration level examples
+6. Add clear labeling of deterministic versus stochastic views
+7. Add professional charts and tables consistent with the terminal design
+
+Requirements:
+- do not build a full hedging simulator yet
+- keep decomposition logic transparent
+- include warnings when decomposition is approximate
+- preserve a clean separation between pricing, risk, and UI layers
+
+Focus on a strong educational but quantitatively serious v1 risk layer.

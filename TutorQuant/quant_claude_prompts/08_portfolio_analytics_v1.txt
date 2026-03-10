@@ -1,0 +1,21 @@
+Build the first version of the Portfolio Pricing module.
+
+Tasks:
+1. Create a position schema for a small portfolio of supported instruments
+2. Support portfolio valuation using existing single instrument pricing engines
+3. Add aggregated Greeks
+4. Add simple scenario shocks across the portfolio
+5. Add portfolio level P&L views
+6. Add VaR and Expected Shortfall architecture and at least one clean baseline implementation
+7. Add contribution reporting by position
+8. Add frontend tables and charts for:
+   - position values
+   - Greek contributions
+   - scenario P&L
+   - tail summaries
+
+Requirements:
+- keep instrument level traceability
+- make methodology assumptions explicit
+- do not overbuild optimization or full risk management workflows
+- keep v1 focused, clean, and reconcilable

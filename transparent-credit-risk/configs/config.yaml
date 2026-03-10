@@ -1,0 +1,81 @@
+# =============================================================================
+# Transparent Credit Risk Classification - Configuration
+# =============================================================================
+# This config controls the entire pipeline: data download, preprocessing,
+# model training, evaluation, and transparency tracing.
+# All paths are relative to the project root.
+
+# --- Project Metadata ---
+project:
+  name: "transparent-credit-risk"
+  version: "1.0.0"
+  description: "Transparent tabular neural network for binary credit risk classification"
+  random_seed: 42
+
+# --- Dataset ---
+data:
+  openml_id: 31                    # German Credit dataset
+  dataset_name: "credit-g"
+  target_column: "class"
+  positive_label: "good"           # Maps to 1 (lower risk)
+  negative_label: "bad"            # Maps to 0 (higher risk)
+  test_size: 0.2
+  validation_size: 0.15            # Fraction of training set used for validation
+  raw_path: "data/raw/credit_data.csv"
+  processed_dir: "data/processed"
+  metadata_dir: "data/metadata"
+
+# --- Feature Configuration ---
+features:
+  # Columns to drop before modeling (suspected leakage or governance concerns)
+  drop_columns: []
+  # Columns to flag for governance review (not necessarily dropped)
+  flag_columns:
+    - "personal_status"
+    - "foreign_worker"
+  # Default feature to trace in transparency demo
+  default_trace_feature: "age"
+
+# --- Preprocessing ---
+preprocessing:
+  numeric_imputer_strategy: "median"
+  categorical_imputer_strategy: "most_frequent"
+  numeric_scaler: "standard"       # "standard" or "minmax"
+  handle_unknown_categories: "infrequent_if_exist"
+  artifacts_dir: "models/preprocessors"
+  lineage_path: "data/metadata/feature_lineage.json"
+  feature_map_path: "data/metadata/transformed_feature_map.csv"
+  dropped_columns_path: "data/metadata/dropped_columns.csv"
+  leakage_review_path: "data/metadata/leakage_review.csv"
+
+# --- Neural Network ---
+model:
+  hidden_size: 32                  # Number of neurons in single hidden layer
+  dropout_rate: 0.2                # Dropout probability (set 0.0 to disable)
+  learning_rate: 0.001
+  weight_decay: 0.0001             # L2 regularization
+  batch_size: 64
+  num_epochs: 100
+  patience: 15                     # Early stopping patience (epochs)
+  model_dir: "models/trained"
+  model_filename: "credit_net.pt"
+
+# --- Baselines ---
+baselines:
+  run_logistic_regression: true
+  run_xgboost: true
+  models_dir: "models/trained"
+
+# --- Evaluation ---
+evaluation:
+  output_dir: "outputs"
+  figures_dir: "outputs/figures"
+  tables_dir: "outputs/tables"
+  reports_dir: "outputs/reports"
+  traces_dir: "outputs/traces"
+
+# --- Streamlit App ---
+app:
+  title: "Credit Risk Transparency Explorer"
+  default_feature: "age"
+  default_row_index: 0

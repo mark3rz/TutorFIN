@@ -1,0 +1,21 @@
+Build the first version of the Interest Rate Models module.
+
+Tasks:
+1. Create rate curve input schemas and a clean normalized internal representation
+2. Add architecture for deposits, futures, FRAs, swaps, par yields, or treasury style inputs with explanation
+3. Implement a clear introductory bootstrapping workflow or scaffold where feasible
+4. Add metadata and model comparison support for:
+   - Vasicek
+   - CIR
+   - Hull White
+5. Implement short rate path simulation for these models where feasible in v1
+6. Add views for:
+   - rate paths
+   - model assumptions
+   - parameter interpretation
+   - bond pricing implications
+7. Add theory content comparing when each model is used and what each misses
+
+Requirements:
+- keep the module separate from Fixed Income but interoperable
+- prioritize clarity and architecture quality over trying to finish every rates detail in one pass
