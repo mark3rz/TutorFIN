@@ -3,14 +3,13 @@
 import { useState } from "react";
 import { SubTabBar } from "@/components/shell/SubTabBar";
 import { TheoryPanel } from "@/components/panels/TheoryPanel";
-import { IRSPricingTab } from "./IRSPricingTab";
-import { SwapCurvesTab } from "./SwapCurvesTab";
-import { OISDiscountingTab } from "./OISDiscountingTab";
-import { SwapTheory } from "./theory/SwapTheory";
+import { SVISurfaceTab } from "./SVISurfaceTab";
+import { RateCalibrationTab } from "./RateCalibrationTab";
+import { CalibrationTheory } from "./theory/CalibrationTheory";
 
-const tabs = ["IRS Pricing", "Swap Curves", "OIS Discounting"];
+const tabs = ["SVI Surface Fitting", "Rate Model Calibration"];
 
-export default function SwapsPage() {
+export default function CalibrationPage() {
   const [activeTab, setActiveTab] = useState(tabs[0]);
 
   return (
@@ -23,10 +22,10 @@ export default function SwapsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-[var(--text-primary)]">
-                Interest Rate Swaps
+                Calibration Lab
               </h1>
               <p className="text-sm text-[var(--text-muted)]">
-                Vanilla IRS pricing, par rates, OIS discounting, and sensitivity analytics
+                SVI surface fitting, rate model calibration, and diagnostics
               </p>
             </div>
             <span className="rounded border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1 text-xs text-[var(--accent-primary)]">
@@ -34,14 +33,13 @@ export default function SwapsPage() {
             </span>
           </div>
 
-          {activeTab === "IRS Pricing" && <IRSPricingTab />}
-          {activeTab === "Swap Curves" && <SwapCurvesTab />}
-          {activeTab === "OIS Discounting" && <OISDiscountingTab />}
+          {activeTab === "SVI Surface Fitting" && <SVISurfaceTab />}
+          {activeTab === "Rate Model Calibration" && <RateCalibrationTab />}
         </div>
 
         {/* Theory Panel */}
-        <TheoryPanel title="Swap Pricing Theory">
-          <SwapTheory />
+        <TheoryPanel title="Calibration Theory">
+          <CalibrationTheory />
         </TheoryPanel>
       </div>
     </div>
