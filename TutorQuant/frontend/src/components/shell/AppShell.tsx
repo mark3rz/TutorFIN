@@ -10,6 +10,7 @@ import {
   Landmark,
   TrendingUp,
   ArrowLeftRight,
+  SlidersHorizontal,
   BookOpen,
   Terminal,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { label: "Fixed Income", href: "/fixed-income", icon: Landmark },
   { label: "Rates", href: "/rates", icon: TrendingUp },
   { label: "Swaps", href: "/swaps", icon: ArrowLeftRight },
+  { label: "Calibration", href: "/calibration", icon: SlidersHorizontal },
   { label: "Encyclopedia", href: "/encyclopedia", icon: BookOpen },
 ];
 

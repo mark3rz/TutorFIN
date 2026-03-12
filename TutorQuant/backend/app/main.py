@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import (
     calibration,
+    encyclopedia,
     fixed_income,
     greeks,
     monte_carlo,
@@ -51,6 +52,7 @@ app.include_router(swaps.router)
 app.include_router(portfolio.router)
 app.include_router(risk.router)
 app.include_router(calibration.router)
+app.include_router(encyclopedia.router)
 app.include_router(volatility.router)
 
 # ── Health check ──────────────────────────────────────────────────────────────

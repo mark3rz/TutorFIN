@@ -44,8 +44,18 @@ class TestComputeDiagnostics:
         assert diag["mae"] == 0.0
         assert diag["sse"] == 0.0
         assert diag["max_abs_err"] == 0.0
-        assert diag["r_squared"] == 1.0
+        # R² is 0.0 when ss_tot=0 (constant market values); this is the
+        # degenerate case — there is no variance to explain.
+        assert diag["r_squared"] == 0.0
         assert diag["n_obs"] == 10
+
+    def test_zero_residuals_varying_market(self):
+        """Perfect fit with varying market values should give R²=1."""
+        market = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        residuals = np.zeros(5)
+        diag = compute_diagnostics(residuals, market)
+        assert diag["rmse"] == 0.0
+        assert diag["r_squared"] == 1.0
 
     def test_known_residuals(self):
         """Known residuals should yield expected diagnostics."""

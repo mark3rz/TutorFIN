@@ -1016,10 +1016,124 @@ export class TutorQuantApi {
     return res.concepts;
   }
 
-  // ── Calibration (stub — Phase 4) ─────────────────────────────────
+  // ── Calibration ────────────────────────────────────────────────────
 
-  async calibrate(request: unknown): Promise<unknown> {
-    return this.request("/api/calibration/calibrate", request);
+  /** Calibrate SVI implied volatility surface */
+  async calibrateSVI(params: {
+    spot?: number;
+    riskFreeRate?: number;
+    dividendYield?: number;
+    slices: {
+      expiry: number;
+      strikes: number[];
+      market_ivs: number[];
+    }[];
+    method?: string;
+  }): Promise<{
+    slices: {
+      expiry: number;
+      forward: number;
+      params: Record<string, number>;
+      fitted_ivs: number[];
+      market_ivs: number[];
+      strikes: number[];
+      log_moneyness: number[];
+      residuals: number[];
+      diagnostics: Record<string, number>;
+      converged: boolean;
+      elapsed_ms: number;
+      iterations: number;
+      method: string;
+    }[];
+    aggregate_diagnostics: Record<string, number>;
+    n_slices: number;
+  }> {
+    return this.request("/api/calibration/svi", {
+      spot: params.spot ?? 100,
+      risk_free_rate: params.riskFreeRate ?? 0.05,
+      dividend_yield: params.dividendYield ?? 0,
+      slices: params.slices,
+      method: params.method ?? "L-BFGS-B",
+    });
+  }
+
+  /** Check SVI parameters for butterfly arbitrage */
+  async checkSVIArbitrage(params: {
+    a: number;
+    b: number;
+    rho: number;
+    m: number;
+    sigma: number;
+  }): Promise<{
+    has_negative_variance: boolean;
+    min_variance: number;
+    is_likely_arbitrage_free: boolean;
+    lee_bound_satisfied: boolean;
+  }> {
+    return this.request("/api/calibration/svi/arbitrage-check", params);
+  }
+
+  /** Calibrate a rate model (Vasicek / CIR) to an observed yield curve */
+  async calibrateRateModel(params: {
+    model?: string;
+    r0?: number;
+    maturities: number[];
+    targetRates: number[];
+    method?: string;
+  }): Promise<{
+    model: string;
+    params: Record<string, number>;
+    r0: number;
+    maturities: number[];
+    target_rates: number[];
+    fitted_rates: number[];
+    residuals: number[];
+    diagnostics: Record<string, number>;
+    converged: boolean;
+    elapsed_ms: number;
+    iterations: number;
+    method: string;
+  }> {
+    return this.request("/api/calibration/rate-model", {
+      model: params.model ?? "vasicek",
+      r0: params.r0 ?? 0.04,
+      maturities: params.maturities,
+      target_rates: params.targetRates,
+      method: params.method ?? "L-BFGS-B",
+    });
+  }
+
+  // ── Encyclopedia ──────────────────────────────────────────────────────
+
+  /** Get all model encyclopedia entries, optionally filtered by category */
+  async getEncyclopediaModels(category?: string): Promise<{
+    models: {
+      id: string;
+      name: string;
+      category: string;
+      formula: string;
+      process: string;
+      assumptions: string[];
+      suitable_instruments: string[];
+      strengths: string[];
+      weaknesses: string[];
+      calibration_burden: string;
+      computational_cost: string;
+      desk_usage: string;
+      failure_modes: string[];
+      fragility_warning: string;
+    }[];
+    total: number;
+  }> {
+    const query = category ? `?category=${encodeURIComponent(category)}` : "";
+    return this.requestGet(`/api/encyclopedia/models${query}`);
+  }
+
+  /** Get encyclopedia categories with model counts */
+  async getEncyclopediaCategories(): Promise<{
+    categories: { id: string; label: string; count: number }[];
+  }> {
+    return this.requestGet("/api/encyclopedia/categories");
   }
 }
 

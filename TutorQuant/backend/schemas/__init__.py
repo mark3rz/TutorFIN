@@ -60,6 +60,12 @@ from schemas.swaps import (
     OISConceptsResponse,
     BasisSwapTypesResponse,
 )
+from schemas.encyclopedia import (
+    ModelEntry,
+    EncyclopediaResponse,
+    CategoryInfo,
+    CategoriesResponse,
+)
 from schemas.calibration import (
     SVICalibrationRequest,
     SVICalibrationResponse,
@@ -142,6 +148,11 @@ __all__ = [
     "BasisSwapResponse",
     "OISConceptsResponse",
     "BasisSwapTypesResponse",
+    # encyclopedia
+    "ModelEntry",
+    "EncyclopediaResponse",
+    "CategoryInfo",
+    "CategoriesResponse",
     # calibration
     "SVICalibrationRequest",
     "SVICalibrationResponse",
