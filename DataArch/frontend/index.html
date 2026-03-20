@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataArch.AI — AI Data Operating System</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  /* ── Reset & Base ──────────────────────────────────────── */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f1117; color: #e0e0e0; min-height: 100vh;
+  }
+  a { color: #4A90D9; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ── Top Nav ───────────────────────────────────────────── */
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 32px; border-bottom: 1px solid #1e2030;
+    background: #13151f;
+  }
+  nav .brand { font-size: 22px; font-weight: 700; }
+  nav .brand span { color: #4A90D9; }
+  nav .tabs { display: flex; gap: 4px; }
+  nav .tab {
+    padding: 8px 18px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 500; color: #888;
+    background: transparent; border: none; transition: all 0.2s;
+  }
+  nav .tab:hover { color: #ccc; background: #1a1d27; }
+  nav .tab.active { color: #fff; background: #4A90D9; }
+
+  /* ── Layout ────────────────────────────────────────────── */
+  main { padding: 32px; max-width: 1400px; margin: 0 auto; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  h2 { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+  h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #ccc; }
+
+  /* ── Cards ─────────────────────────────────────────────── */
+  .card {
+    background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px;
+    padding: 24px; margin-bottom: 20px;
+  }
+
+  /* ── Upload Zone ───────────────────────────────────────── */
+  #drop-zone {
+    border: 2px dashed #2a2d3a; border-radius: 12px; padding: 48px;
+    text-align: center; cursor: pointer; transition: all 0.3s;
+    background: #13151f;
+  }
+  #drop-zone:hover, #drop-zone.drag-over {
+    border-color: #4A90D9; background: #151825;
+  }
+  #drop-zone .icon { font-size: 40px; margin-bottom: 12px; }
+  #drop-zone h3 { color: #e0e0e0; margin-bottom: 8px; }
+  #drop-zone p { font-size: 13px; color: #666; }
+  #file-input { display: none; }
+
+  .file-types {
+    display: flex; gap: 8px; justify-content: center; margin-top: 12px;
+  }
+  .file-type-badge {
+    background: #22252f; border: 1px solid #2a2d3a; border-radius: 6px;
+    padding: 3px 10px; font-size: 11px; color: #888;
+  }
+
+  /* ── Pipeline Progress ─────────────────────────────────── */
+  #pipeline-section { display: none; }
+  .pipeline-steps { display: flex; gap: 0; margin-bottom: 20px; }
+  .pipeline-step {
+    flex: 1; text-align: center; padding: 16px 8px; position: relative;
+    background: #1a1d27; border: 1px solid #2a2d3a;
+  }
+  .pipeline-step:first-child { border-radius: 12px 0 0 12px; }
+  .pipeline-step:last-child { border-radius: 0 12px 12px 0; }
+  .pipeline-step .step-num {
+    width: 28px; height: 28px; border-radius: 50%; line-height: 28px;
+    font-size: 13px; font-weight: 700; margin: 0 auto 8px;
+    background: #2a2d3a; color: #888;
+  }
+  .pipeline-step .step-label { font-size: 12px; color: #888; }
+  .pipeline-step.active .step-num { background: #4A90D9; color: #fff; }
+  .pipeline-step.active .step-label { color: #e0e0e0; }
+  .pipeline-step.done .step-num { background: #50C878; color: #fff; }
+  .pipeline-step.done .step-label { color: #50C878; }
+  .pipeline-step.error .step-num { background: #E74C3C; color: #fff; }
+  .pipeline-step.error .step-label { color: #E74C3C; }
+
+  #pipeline-log {
+    background: #0d0f15; border: 1px solid #1e2030; border-radius: 8px;
+    padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    max-height: 200px; overflow-y: auto; color: #888;
+  }
+  #pipeline-log .log-line { margin-bottom: 2px; }
+  #pipeline-log .log-success { color: #50C878; }
+  #pipeline-log .log-error { color: #E74C3C; }
+  #pipeline-log .log-info { color: #4A90D9; }
+
+  /* ── Tables ────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; color: #666; text-transform: uppercase;
+       letter-spacing: 0.05em; padding: 10px 12px; border-bottom: 1px solid #2a2d3a; }
+  td { font-size: 13px; padding: 10px 12px; border-bottom: 1px solid #1e2030; }
+  tr:hover td { background: #1e2030; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge-vendor { background: #1e3454; color: #4A90D9; }
+  .badge-customer { background: #1e4d2b; color: #50C878; }
+  .badge-employee { background: #4d3e1e; color: #F5A623; }
+  .badge-product { background: #3b1e4d; color: #9B59B6; }
+  .badge-transaction { background: #4d1e1e; color: #E74C3C; }
+  .badge-contract { background: #1e4d44; color: #1ABC9C; }
+  .badge-financial_record { background: #4d3b1e; color: #F39C12; }
+  .badge-business_unit { background: #1e3454; color: #3498DB; }
+  .badge-unknown { background: #2a2d3a; color: #95A5A6; }
+
+  .conf-high { color: #50C878; }
+  .conf-medium { color: #F5A623; }
+  .conf-low { color: #E74C3C; }
+
+  /* ── Schema View ───────────────────────────────────────── */
+  .schema-table-card {
+    background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px;
+    padding: 20px; margin-bottom: 16px;
+  }
+  .schema-table-card h3 {
+    font-size: 16px; margin-bottom: 4px;
+  }
+  .schema-table-card .table-meta {
+    font-size: 12px; color: #666; margin-bottom: 12px;
+  }
+  .col-type {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: #9B59B6;
+  }
+  .col-pk { color: #F5A623; font-weight: 700; }
+  .col-fk { color: #1ABC9C; }
+  .col-nullable { color: #666; font-style: italic; }
+
+  pre.ddl {
+    background: #0d0f15; border: 1px solid #1e2030; border-radius: 8px;
+    padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    overflow-x: auto; color: #ccc; white-space: pre; max-height: 500px;
+    overflow-y: auto;
+  }
+
+  /* ── Data Flow Embed ───────────────────────────────────── */
+  #dataflow-frame {
+    width: 100%; height: 600px; border: 1px solid #2a2d3a;
+    border-radius: 12px; background: #0f1117;
+  }
+
+  /* ── Buttons ───────────────────────────────────────────── */
+  .btn {
+    padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600; transition: all 0.2s;
+  }
+  .btn-primary { background: #4A90D9; color: #fff; }
+  .btn-primary:hover { background: #3a7bc8; }
+  .btn-primary:disabled { background: #2a3a5a; color: #666; cursor: not-allowed; }
+  .btn-secondary { background: #22252f; color: #ccc; border: 1px solid #2a2d3a; }
+  .btn-secondary:hover { background: #2a2d3a; }
+
+  .btn-group { display: flex; gap: 8px; margin-bottom: 20px; }
+
+  /* ── Spinner ───────────────────────────────────────────── */
+  .spinner {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2px solid #2a2d3a; border-top-color: #4A90D9;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Empty state ───────────────────────────────────────── */
+  .empty {
+    text-align: center; padding: 48px; color: #666;
+  }
+  .empty h3 { font-size: 16px; color: #888; margin-bottom: 8px; }
+
+  /* ── Stats row ─────────────────────────────────────────── */
+  .stats-row { display: flex; gap: 16px; margin-bottom: 24px; }
+  .stat-card {
+    flex: 1; background: #1a1d27; border: 1px solid #2a2d3a;
+    border-radius: 12px; padding: 20px; text-align: center;
+  }
+  .stat-card .stat-value {
+    font-size: 32px; font-weight: 700; color: #4A90D9;
+  }
+  .stat-card .stat-label {
+    font-size: 12px; color: #888; margin-top: 4px;
+  }
+
+  /* ── Search ────────────────────────────────────────────── */
+  .search-bar {
+    width: 100%; padding: 10px 16px; background: #13151f;
+    border: 1px solid #2a2d3a; border-radius: 8px; color: #e0e0e0;
+    font-size: 13px; margin-bottom: 16px; outline: none;
+  }
+  .search-bar:focus { border-color: #4A90D9; }
+  .search-bar::placeholder { color: #555; }
+
+  /* ── Tab content transitions ───────────────────────────── */
+  .fade-in { animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand">DataArch<span>.AI</span></div>
+  <div class="tabs">
+    <button class="tab active" data-page="upload">Upload</button>
+    <button class="tab" data-page="registry">Entity Registry</button>
+    <button class="tab" data-page="schema">Schema</button>
+    <button class="tab" data-page="dataflow">Data Flow</button>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ════════════════ PAGE: Upload ════════════════ -->
+  <div id="page-upload" class="page active fade-in">
+    <h2>Upload Documents</h2>
+
+    <div id="drop-zone">
+      <div class="icon">&#128196;</div>
+      <h3>Drop files here or click to browse</h3>
+      <p>Supported formats:</p>
+      <div class="file-types">
+        <span class="file-type-badge">PDF</span>
+        <span class="file-type-badge">XLSX</span>
+        <span class="file-type-badge">CSV</span>
+        <span class="file-type-badge">DOCX</span>
+        <span class="file-type-badge">EML</span>
+      </div>
+    </div>
+    <input type="file" id="file-input" accept=".pdf,.xlsx,.xlsm,.csv,.docx,.doc,.eml" multiple>
+
+    <div id="pipeline-section">
+      <h3 style="margin-top: 24px;">Pipeline Progress</h3>
+      <div class="pipeline-steps">
+        <div class="pipeline-step" id="step-ingest">
+          <div class="step-num">1</div>
+          <div class="step-label">Ingest</div>
+        </div>
+        <div class="pipeline-step" id="step-ontology">
+          <div class="step-num">2</div>
+          <div class="step-label">Ontology Map</div>
+        </div>
+        <div class="pipeline-step" id="step-schema">
+          <div class="step-num">3</div>
+          <div class="step-label">Schema Gen</div>
+        </div>
+        <div class="pipeline-step" id="step-dataflow">
+          <div class="step-num">4</div>
+          <div class="step-label">Data Flow</div>
+        </div>
+      </div>
+      <div id="pipeline-log"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════ PAGE: Entity Registry ════════════════ -->
+  <div id="page-registry" class="page">
+    <h2>Entity Registry</h2>
+    <div id="registry-stats" class="stats-row"></div>
+    <input type="text" class="search-bar" id="registry-search" placeholder="Search entities...">
+    <div class="card">
+      <div id="registry-table-container">
+        <div class="empty"><h3>No entities yet</h3><p>Upload and process documents to populate the registry.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════ PAGE: Schema ════════════════ -->
+  <div id="page-schema" class="page">
+    <h2>Generated Schema</h2>
+    <div class="btn-group">
+      <button class="btn btn-secondary" id="btn-view-visual" onclick="setSchemaView('visual')">Visual</button>
+      <button class="btn btn-secondary" id="btn-view-ddl" onclick="setSchemaView('ddl')">DDL</button>
+    </div>
+    <div id="schema-visual"></div>
+    <div id="schema-ddl" style="display:none;"></div>
+  </div>
+
+  <!-- ════════════════ PAGE: Data Flow ════════════════ -->
+  <div id="page-dataflow" class="page">
+    <h2>Data Flow Map</h2>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="regenerateDataflow()">Regenerate Graph</button>
+      <button class="btn btn-secondary" onclick="openFullscreen()">Open Fullscreen</button>
+    </div>
+    <iframe id="dataflow-frame" src="/static/dataflow.html" frameborder="0"></iframe>
+  </div>
+
+</main>
+
+<script>
+const API = window.location.origin;
+
+// ── Tab navigation ──────────────────────────────────────────────────────────
+document.querySelectorAll("nav .tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll("nav .tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".page").forEach(p => p.classList.remove("active", "fade-in"));
+    tab.classList.add("active");
+    const page = document.getElementById(`page-${tab.dataset.page}`);
+    page.classList.add("active", "fade-in");
+
+    // Load data on tab switch
+    if (tab.dataset.page === "registry") loadRegistry();
+    if (tab.dataset.page === "schema") loadSchema();
+    if (tab.dataset.page === "dataflow") reloadDataflowFrame();
+  });
+});
+
+// ── Upload / Drop zone ──────────────────────────────────────────────────────
+const dropZone = document.getElementById("drop-zone");
+const fileInput = document.getElementById("file-input");
+
+dropZone.addEventListener("click", () => fileInput.click());
+dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+dropZone.addEventListener("drop", e => {
+  e.preventDefault();
+  dropZone.classList.remove("drag-over");
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener("change", e => handleFiles(e.target.files));
+
+async function handleFiles(files) {
+  if (files.length === 0) return;
+
+  const section = document.getElementById("pipeline-section");
+  section.style.display = "block";
+
+  for (const file of files) {
+    await runPipeline(file);
+  }
+}
+
+function setStep(stepId, state) {
+  const el = document.getElementById(stepId);
+  el.classList.remove("active", "done", "error");
+  if (state) el.classList.add(state);
+}
+
+function addLog(msg, type = "") {
+  const log = document.getElementById("pipeline-log");
+  const div = document.createElement("div");
+  div.className = `log-line ${type ? "log-" + type : ""}`;
+  div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function runPipeline(file) {
+  // Reset steps
+  ["step-ingest", "step-ontology", "step-schema", "step-dataflow"].forEach(s => setStep(s, ""));
+  document.getElementById("pipeline-log").innerHTML = "";
+
+  // Step 1: Ingest
+  setStep("step-ingest", "active");
+  addLog(`Uploading ${file.name}...`, "info");
+
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${API}/ingest`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(`Ingest failed: ${res.status}`);
+    const data = await res.json();
+    addLog(`Ingested: ${data.metadata.filename} | ${data.entities.length} entities | ${data.status}`, "success");
+    setStep("step-ingest", "done");
+
+    const docId = file.name.replace(/\.[^.]+$/, "");
+
+    // Step 2: Ontology
+    setStep("step-ontology", "active");
+    addLog("Running ontology mapper...", "info");
+    const ontRes = await fetch(`${API}/ontology/map/${docId}`, { method: "POST" });
+    if (!ontRes.ok) throw new Error(`Ontology mapping failed: ${ontRes.status}`);
+    const ontData = await ontRes.json();
+    addLog(`Mapped ${ontData.records.length} entities, ${ontData.unmapped_count} unmapped`, "success");
+    setStep("step-ontology", "done");
+
+    // Step 3: Schema
+    setStep("step-schema", "active");
+    addLog("Generating schema...", "info");
+    const schemaRes = await fetch(`${API}/schema/generate`, { method: "POST" });
+    if (!schemaRes.ok) throw new Error(`Schema generation failed: ${schemaRes.status}`);
+    const schemaData = await schemaRes.json();
+    addLog(`Generated ${schemaData.tables.length} tables`, "success");
+    setStep("step-schema", "done");
+
+    // Step 4: Data Flow
+    setStep("step-dataflow", "active");
+    addLog("Building data flow graph...", "info");
+    const dfRes = await fetch(`${API}/dataflow/generate`, { method: "POST" });
+    if (!dfRes.ok) throw new Error(`Data flow generation failed: ${dfRes.status}`);
+    const dfData = await dfRes.json();
+    addLog(`Graph: ${dfData.stats.total_types} types, ${dfData.stats.total_entities} entities, ${dfData.stats.total_relationships} relationships`, "success");
+    setStep("step-dataflow", "done");
+
+    addLog("Pipeline complete!", "success");
+
+  } catch (err) {
+    addLog(err.message, "error");
+    // Mark current active step as error
+    document.querySelectorAll(".pipeline-step.active").forEach(s => {
+      s.classList.remove("active");
+      s.classList.add("error");
+    });
+  }
+}
+
+// ── Entity Registry ─────────────────────────────────────────────────────────
+let registryData = null;
+
+async function loadRegistry() {
+  try {
+    const res = await fetch(`${API}/ontology/registry`);
+    const data = await res.json();
+    registryData = data;
+    renderRegistry(data);
+  } catch (e) {
+    console.error("Failed to load registry:", e);
+  }
+}
+
+function renderRegistry(data) {
+  const entries = data.entries || {};
+  const records = Object.values(entries);
+
+  // Stats
+  const typeCount = {};
+  records.forEach(r => {
+    typeCount[r.ontology_type] = (typeCount[r.ontology_type] || 0) + 1;
+  });
+
+  const statsEl = document.getElementById("registry-stats");
+  statsEl.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-value">${records.length}</div>
+      <div class="stat-label">Total Entities</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${Object.keys(typeCount).length}</div>
+      <div class="stat-label">Entity Types</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">${records.filter(r => r.confidence === "high").length}</div>
+      <div class="stat-label">High Confidence</div>
+    </div>
+  `;
+
+  const container = document.getElementById("registry-table-container");
+  if (records.length === 0) {
+    container.innerHTML = `<div class="empty"><h3>No entities yet</h3><p>Upload and process documents to populate the registry.</p></div>`;
+    return;
+  }
+
+  let html = `<table>
+    <thead><tr>
+      <th>Name</th><th>Type</th><th>Confidence</th><th>Aliases</th><th>Source</th>
+    </tr></thead><tbody>`;
+
+  for (const r of records.sort((a, b) => a.canonical_name.localeCompare(b.canonical_name))) {
+    html += `<tr data-search="${(r.canonical_name + " " + r.ontology_type + " " + (r.aliases || []).join(" ")).toLowerCase()}">
+      <td><strong>${r.canonical_name}</strong></td>
+      <td><span class="badge badge-${r.ontology_type}">${r.ontology_type}</span></td>
+      <td><span class="conf-${r.confidence}">${r.confidence}</span></td>
+      <td>${(r.aliases || []).join(", ") || "-"}</td>
+      <td>${r.source_file}</td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+  container.innerHTML = html;
+}
+
+// Search
+document.getElementById("registry-search").addEventListener("input", e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll("#registry-table-container tbody tr").forEach(row => {
+    row.style.display = row.dataset.search.includes(q) ? "" : "none";
+  });
+});
+
+// ── Schema View ─────────────────────────────────────────────────────────────
+let schemaView = "visual";
+
+function setSchemaView(view) {
+  schemaView = view;
+  document.getElementById("btn-view-visual").classList.toggle("btn-primary", view === "visual");
+  document.getElementById("btn-view-visual").classList.toggle("btn-secondary", view !== "visual");
+  document.getElementById("btn-view-ddl").classList.toggle("btn-primary", view === "ddl");
+  document.getElementById("btn-view-ddl").classList.toggle("btn-secondary", view !== "ddl");
+  document.getElementById("schema-visual").style.display = view === "visual" ? "block" : "none";
+  document.getElementById("schema-ddl").style.display = view === "ddl" ? "block" : "none";
+}
+
+async function loadSchema() {
+  try {
+    // Load JSON schema
+    const res = await fetch(`${API}/schema`);
+    if (!res.ok) {
+      document.getElementById("schema-visual").innerHTML = `<div class="empty"><h3>No schema generated</h3><p>Upload documents and run the pipeline first.</p></div>`;
+      document.getElementById("schema-ddl").innerHTML = `<div class="empty"><h3>No schema generated</h3></div>`;
+      return;
+    }
+    const schema = await res.json();
+    renderSchemaVisual(schema);
+
+    // Load DDL
+    const ddlRes = await fetch(`${API}/schema/sql`);
+    if (ddlRes.ok) {
+      const ddl = await ddlRes.text();
+      document.getElementById("schema-ddl").innerHTML = `<pre class="ddl">${escapeHtml(ddl)}</pre>`;
+    }
+  } catch (e) {
+    console.error("Failed to load schema:", e);
+  }
+
+  setSchemaView(schemaView);
+}
+
+function renderSchemaVisual(schema) {
+  const container = document.getElementById("schema-visual");
+
+  if (!schema.tables || schema.tables.length === 0) {
+    container.innerHTML = `<div class="empty"><h3>No tables generated</h3><p>The entity registry may be empty.</p></div>`;
+    return;
+  }
+
+  let html = "";
+  for (const table of schema.tables) {
+    html += `<div class="schema-table-card">`;
+    html += `<h3><span class="badge badge-${table.table_name}">${table.table_name}</span></h3>`;
+    html += `<div class="table-meta">${table.record_count} source records | ${table.columns.length} columns</div>`;
+    html += `<table><thead><tr><th>Column</th><th>Type</th><th>Constraints</th></tr></thead><tbody>`;
+
+    for (const col of table.columns) {
+      let constraints = [];
+      if (col.primary_key) constraints.push(`<span class="col-pk">PK</span>`);
+      const fk = (table.foreign_keys || []).find(f => f.column === col.name);
+      if (fk) constraints.push(`<span class="col-fk">FK &rarr; ${fk.references_table}</span>`);
+      if (!col.nullable && !col.primary_key) constraints.push("NOT NULL");
+      if (col.nullable) constraints.push(`<span class="col-nullable">nullable</span>`);
+
+      html += `<tr>
+        <td>${col.name}</td>
+        <td><span class="col-type">${col.type}</span></td>
+        <td>${constraints.join(" ")}</td>
+      </tr>`;
+    }
+    html += `</tbody></table></div>`;
+  }
+  container.innerHTML = html;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// ── Data Flow ───────────────────────────────────────────────────────────────
+function reloadDataflowFrame() {
+  const frame = document.getElementById("dataflow-frame");
+  frame.src = frame.src;
+}
+
+async function regenerateDataflow() {
+  try {
+    await fetch(`${API}/dataflow/generate`, { method: "POST" });
+    reloadDataflowFrame();
+  } catch (e) {
+    console.error("Failed to regenerate:", e);
+  }
+}
+
+function openFullscreen() {
+  window.open("/static/dataflow.html", "_blank");
+}
+</script>
+</body>
+</html>
