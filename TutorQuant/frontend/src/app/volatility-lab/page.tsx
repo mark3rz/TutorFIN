@@ -7,9 +7,10 @@ import { ImpliedVolTab } from "./ImpliedVolTab";
 import { SmileSkewTab } from "./SmileSkewTab";
 import { SurfaceTab } from "./SurfaceTab";
 import { TermStructureTab } from "./TermStructureTab";
+import { VolAnalysisTab } from "./VolAnalysisTab";
 import { VolatilityTheory } from "./theory/VolatilityTheory";
 
-const tabs = ["Implied Vol", "Smile & Skew", "Surface", "Term Structure"];
+const tabs = ["Vol Analysis", "Implied Vol", "Smile & Skew", "Surface", "Term Structure"];
 
 export default function VolatilityLabPage() {
   const [activeTab, setActiveTab] = useState(tabs[0]);
@@ -27,7 +28,10 @@ export default function VolatilityLabPage() {
                 Volatility Lab
               </h1>
               <p className="text-sm text-[var(--text-muted)]">
-                Implied volatility, smile, surface, and term structure analysis
+                {activeTab === "Vol Analysis"
+                  ? "Compare your vol assumption against market-implied and realized volatility"
+                  : "Implied volatility, smile, surface, and term structure analysis"
+                }
               </p>
             </div>
             <span className="rounded border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-1 text-xs text-[var(--accent-primary)]">
@@ -35,6 +39,7 @@ export default function VolatilityLabPage() {
             </span>
           </div>
 
+          {activeTab === "Vol Analysis" && <VolAnalysisTab />}
           {activeTab === "Implied Vol" && <ImpliedVolTab />}
           {activeTab === "Smile & Skew" && <SmileSkewTab />}
           {activeTab === "Surface" && <SurfaceTab />}

@@ -45,6 +45,26 @@ export class TutorQuantApi {
     return response.json() as Promise<T>;
   }
 
+  /** Internal GET wrapper with error handling */
+  private async requestGet<T>(endpoint: string): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new ApiError(
+        response.status,
+        `API error ${response.status}: ${errorBody}`,
+      );
+    }
+
+    return response.json() as Promise<T>;
+  }
+
   // ── Option Pricing ───────────────────────────────────────────────
 
   /**
@@ -742,22 +762,445 @@ export class TutorQuantApi {
     return this.request("/api/fixed-income/price-bond", request);
   }
 
-  // ── Rates (stub — Phase 3) ───────────────────────────────────────
+  // ── Interest Rate Models ────────────────────────────────────────
 
-  async simulateRates(request: unknown): Promise<unknown> {
-    return this.request("/api/rates/simulate", request);
+  /** Simulate short-rate paths under a chosen model */
+  async simulateRates(params: {
+    model: string;
+    r0: number;
+    params: Record<string, number>;
+    horizonYears?: number;
+    nPaths?: number;
+    nSteps?: number;
+    seed?: number | null;
+  }): Promise<{
+    model: string;
+    times: number[];
+    paths: number[][];
+    mean_rate: number[];
+    std_rate: number[];
+    terminal_distribution: number[];
+    metadata?: Record<string, unknown>;
+  }> {
+    return this.request("/api/rates/simulate", {
+      model: params.model,
+      r0: params.r0,
+      params: params.params,
+      horizon_years: params.horizonYears ?? 1.0,
+      simulation_config: {
+        num_paths: params.nPaths ?? 100,
+        num_steps: params.nSteps ?? 252,
+        seed: params.seed ?? null,
+      },
+    });
   }
 
-  // ── Swaps (stub — Phase 4) ───────────────────────────────────────
-
-  async priceSwap(request: unknown): Promise<unknown> {
-    return this.request("/api/swaps/price", request);
+  /** Get analytical yield curve implied by a rate model */
+  async rateModelYieldCurve(params: {
+    model: string;
+    r0: number;
+    params: Record<string, number>;
+    maturities?: number[];
+  }): Promise<{
+    model: string;
+    maturities: number[];
+    bond_prices: number[];
+    zero_rates: number[];
+  }> {
+    return this.request("/api/rates/yield-curve", {
+      model: params.model,
+      r0: params.r0,
+      params: params.params,
+      maturities: params.maturities ?? null,
+    });
   }
 
-  // ── Calibration (stub — Phase 4) ─────────────────────────────────
+  /** Get structured model comparison table */
+  async getModelComparison(): Promise<{
+    model_id: string;
+    name: string;
+    sde: string;
+    mean_reversion: string;
+    positivity: string;
+    volatility_structure: string;
+    analytical_bond_price: boolean;
+    practical_intuition: string;
+    common_use_cases: string;
+    limitations: string;
+    distribution: string;
+  }[]> {
+    const res = await this.requestGet<{
+      models: {
+        model_id: string;
+        name: string;
+        sde: string;
+        mean_reversion: string;
+        positivity: string;
+        volatility_structure: string;
+        analytical_bond_price: boolean;
+        practical_intuition: string;
+        common_use_cases: string;
+        limitations: string;
+        distribution: string;
+      }[];
+    }>("/api/rates/comparison");
+    return res.models;
+  }
 
-  async calibrate(request: unknown): Promise<unknown> {
-    return this.request("/api/calibration/calibrate", request);
+  /** Compare yield curves from multiple models */
+  async compareCurves(params: {
+    r0: number;
+    models: {
+      model: string;
+      params: Record<string, number>;
+      label: string;
+    }[];
+    maturities?: number[];
+  }): Promise<{
+    series: {
+      model: string;
+      label: string;
+      maturities: number[];
+      bond_prices: number[];
+      zero_rates: number[];
+    }[];
+  }> {
+    return this.request("/api/rates/compare-curves", {
+      r0: params.r0,
+      models: params.models,
+      maturities: params.maturities ?? null,
+    });
+  }
+
+  // ── Swaps ──────────────────────────────────────────────────────────
+
+  /** Price a vanilla fixed-for-floating interest rate swap */
+  async priceSwap(params: {
+    notional?: number;
+    fixedRate: number;
+    tenorYears: number;
+    discountRate?: number;
+    discountCurve?: { tenor: number; rate: number }[];
+    payFreq?: number;
+    recFreq?: number;
+    floatSpread?: number;
+    isPayer?: boolean;
+  }): Promise<{
+    npv: number;
+    fixed_leg_pv: number;
+    float_leg_pv: number;
+    par_rate: number;
+    fixed_cashflows: {
+      time: number;
+      tau: number;
+      amount: number;
+      df: number;
+      pv: number;
+    }[];
+    float_cashflows: {
+      time: number;
+      tau: number;
+      forward_rate: number;
+      spread: number;
+      all_in_rate: number;
+      amount: number;
+      df: number;
+      pv: number;
+    }[];
+    annuity: number;
+    dv01: number;
+    notional: number;
+    tenor_years: number;
+    fixed_rate: number;
+    is_payer: boolean;
+  }> {
+    return this.request("/api/swaps/price", {
+      notional: params.notional ?? 1_000_000,
+      fixed_rate: params.fixedRate,
+      tenor_years: params.tenorYears,
+      discount_rate: params.discountRate ?? 0.04,
+      discount_curve: params.discountCurve ?? null,
+      pay_freq: params.payFreq ?? 2,
+      rec_freq: params.recFreq ?? 4,
+      float_spread: params.floatSpread ?? 0,
+      is_payer: params.isPayer ?? true,
+    });
+  }
+
+  /** Compute swap rate sensitivities (DV01, convexity) */
+  async swapSensitivity(params: {
+    notional?: number;
+    fixedRate: number;
+    tenorYears: number;
+    discountRate: number;
+    payFreq?: number;
+    recFreq?: number;
+    floatSpread?: number;
+    bumpBps?: number;
+  }): Promise<{
+    base_npv: number;
+    dv01: number;
+    convexity: number;
+    par_rate: number;
+    rate_bumps: number[];
+    npvs: number[];
+  }> {
+    return this.request("/api/swaps/sensitivity", {
+      notional: params.notional ?? 1_000_000,
+      fixed_rate: params.fixedRate,
+      tenor_years: params.tenorYears,
+      discount_rate: params.discountRate,
+      pay_freq: params.payFreq ?? 2,
+      rec_freq: params.recFreq ?? 4,
+      float_spread: params.floatSpread ?? 0,
+      bump_bps: params.bumpBps ?? 1.0,
+    });
+  }
+
+  /** Compute par swap rate curve across tenors */
+  async swapParCurve(params: {
+    discountRate?: number;
+    discountCurve?: { tenor: number; rate: number }[];
+    payFreq?: number;
+    tenors?: number[];
+  }): Promise<{
+    tenors: number[];
+    par_rates: number[];
+  }> {
+    return this.request("/api/swaps/par-curve", {
+      discount_rate: params.discountRate ?? 0.04,
+      discount_curve: params.discountCurve ?? null,
+      pay_freq: params.payFreq ?? 2,
+      tenors: params.tenors ?? null,
+    });
+  }
+
+  /** Price swap under dual-curve (OIS discounting) framework */
+  async priceDualCurve(params: {
+    notional?: number;
+    fixedRate: number;
+    tenorYears: number;
+    projectionRate: number;
+    discountRate: number;
+    payFreq?: number;
+    recFreq?: number;
+    floatSpread?: number;
+  }): Promise<{
+    npv: number;
+    fixed_leg_pv: number;
+    float_leg_pv: number;
+    par_rate: number;
+    single_curve_npv: number;
+    single_curve_par_rate: number;
+    basis_adjustment: number;
+    projection_rate: number;
+    discount_rate: number;
+  }> {
+    return this.request("/api/swaps/dual-curve", {
+      notional: params.notional ?? 1_000_000,
+      fixed_rate: params.fixedRate,
+      tenor_years: params.tenorYears,
+      projection_rate: params.projectionRate,
+      discount_rate: params.discountRate,
+      pay_freq: params.payFreq ?? 2,
+      rec_freq: params.recFreq ?? 4,
+      float_spread: params.floatSpread ?? 0,
+    });
+  }
+
+  /** Get OIS discounting educational concepts */
+  async getOISConcepts(): Promise<{ concept: string; description: string }[]> {
+    const res = await this.requestGet<{
+      concepts: { concept: string; description: string }[];
+    }>("/api/swaps/ois-concepts");
+    return res.concepts;
+  }
+
+  // ── Calibration ────────────────────────────────────────────────────
+
+  /** Calibrate SVI implied volatility surface */
+  async calibrateSVI(params: {
+    spot?: number;
+    riskFreeRate?: number;
+    dividendYield?: number;
+    slices: {
+      expiry: number;
+      strikes: number[];
+      market_ivs: number[];
+    }[];
+    method?: string;
+  }): Promise<{
+    slices: {
+      expiry: number;
+      forward: number;
+      params: Record<string, number>;
+      fitted_ivs: number[];
+      market_ivs: number[];
+      strikes: number[];
+      log_moneyness: number[];
+      residuals: number[];
+      diagnostics: Record<string, number>;
+      converged: boolean;
+      elapsed_ms: number;
+      iterations: number;
+      method: string;
+    }[];
+    aggregate_diagnostics: Record<string, number>;
+    n_slices: number;
+  }> {
+    return this.request("/api/calibration/svi", {
+      spot: params.spot ?? 100,
+      risk_free_rate: params.riskFreeRate ?? 0.05,
+      dividend_yield: params.dividendYield ?? 0,
+      slices: params.slices,
+      method: params.method ?? "L-BFGS-B",
+    });
+  }
+
+  /** Check SVI parameters for butterfly arbitrage */
+  async checkSVIArbitrage(params: {
+    a: number;
+    b: number;
+    rho: number;
+    m: number;
+    sigma: number;
+  }): Promise<{
+    has_negative_variance: boolean;
+    min_variance: number;
+    is_likely_arbitrage_free: boolean;
+    lee_bound_satisfied: boolean;
+  }> {
+    return this.request("/api/calibration/svi/arbitrage-check", params);
+  }
+
+  /** Calibrate a rate model (Vasicek / CIR) to an observed yield curve */
+  async calibrateRateModel(params: {
+    model?: string;
+    r0?: number;
+    maturities: number[];
+    targetRates: number[];
+    method?: string;
+  }): Promise<{
+    model: string;
+    params: Record<string, number>;
+    r0: number;
+    maturities: number[];
+    target_rates: number[];
+    fitted_rates: number[];
+    residuals: number[];
+    diagnostics: Record<string, number>;
+    converged: boolean;
+    elapsed_ms: number;
+    iterations: number;
+    method: string;
+  }> {
+    return this.request("/api/calibration/rate-model", {
+      model: params.model ?? "vasicek",
+      r0: params.r0 ?? 0.04,
+      maturities: params.maturities,
+      target_rates: params.targetRates,
+      method: params.method ?? "L-BFGS-B",
+    });
+  }
+
+  // ── Encyclopedia ──────────────────────────────────────────────────────
+
+  /** Get all model encyclopedia entries, optionally filtered by category */
+  async getEncyclopediaModels(category?: string): Promise<{
+    models: {
+      id: string;
+      name: string;
+      category: string;
+      formula: string;
+      process: string;
+      assumptions: string[];
+      suitable_instruments: string[];
+      strengths: string[];
+      weaknesses: string[];
+      calibration_burden: string;
+      computational_cost: string;
+      desk_usage: string;
+      failure_modes: string[];
+      fragility_warning: string;
+    }[];
+    total: number;
+  }> {
+    const query = category ? `?category=${encodeURIComponent(category)}` : "";
+    return this.requestGet(`/api/encyclopedia/models${query}`);
+  }
+
+  /** Get encyclopedia categories with model counts */
+  async getEncyclopediaCategories(): Promise<{
+    categories: { id: string; label: string; count: number }[];
+  }> {
+    return this.requestGet("/api/encyclopedia/categories");
+  }
+
+  // ── Market Data ──────────────────────────────────────────────────────
+
+  /** Fetch a real-time quote for a ticker */
+  async getQuote(ticker: string): Promise<{
+    ticker: string;
+    name: string;
+    spot: number;
+    currency: string;
+    change: number;
+    change_pct: number;
+    volume: number;
+    market_cap: number;
+    timestamp: string;
+  }> {
+    return this.requestGet(`/api/market-data/quote?ticker=${encodeURIComponent(ticker)}`);
+  }
+
+  /** Fetch historical OHLCV bars */
+  async getHistory(
+    ticker: string,
+    period: string = "1y",
+    interval: string = "1d",
+  ): Promise<{
+    ticker: string;
+    period: string;
+    interval: string;
+    bars: { date: string; open: number; high: number; low: number; close: number; volume: number }[];
+  }> {
+    const params = new URLSearchParams({ ticker, period, interval });
+    return this.requestGet(`/api/market-data/history?${params.toString()}`);
+  }
+
+  /** Fetch options chain for a specific expiration */
+  async getOptionsChain(
+    ticker: string,
+    expiration: string,
+  ): Promise<{
+    ticker: string;
+    expiration: string;
+    calls: { strike: number; bid: number; ask: number; last: number; volume: number; open_interest: number; implied_vol: number; option_type: string }[];
+    puts: { strike: number; bid: number; ask: number; last: number; volume: number; open_interest: number; implied_vol: number; option_type: string }[];
+  }> {
+    const params = new URLSearchParams({ ticker, expiration });
+    return this.requestGet(`/api/market-data/options?${params.toString()}`);
+  }
+
+  /** Get available option expiration dates */
+  async getExpirations(ticker: string): Promise<{
+    ticker: string;
+    expirations: string[];
+  }> {
+    return this.requestGet(`/api/market-data/expirations?ticker=${encodeURIComponent(ticker)}`);
+  }
+
+  /** Search for ticker symbols */
+  async searchTickers(query: string): Promise<{
+    symbol: string;
+    name: string;
+    exchange: string;
+    instrument_type: string;
+  }[]> {
+    const res = await this.requestGet<{
+      results: { symbol: string; name: string; exchange: string; instrument_type: string }[];
+    }>(`/api/market-data/search?q=${encodeURIComponent(query)}`);
+    return res.results;
   }
 }
 

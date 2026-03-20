@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { TheoryPanel } from "@/components/panels/TheoryPanel";
 import { BSMDerivation } from "./theory/BSMDerivation";
 import { api } from "@/lib/api";
+import { useWorkbench, generateWorkbenchId } from "@/context/WorkbenchContext";
+import { Briefcase, Check } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
 /*  Greek metadata for display                                         */
@@ -71,6 +73,9 @@ export function PricingTab() {
   const [greeksResult, setGreeksResult] = useState<GreeksResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
+  const { addOption } = useWorkbench();
 
   /* ---- helpers ---- */
   const optionTypeValue = optionType === "Call" ? "call" : "put";
@@ -80,6 +85,7 @@ export function PricingTab() {
     setError(null);
     setPriceResult(null);
     setGreeksResult(null);
+    setSent(false);
 
     const params = {
       spot,
@@ -225,6 +231,34 @@ export function PricingTab() {
                 </div>
               ))}
             </div>
+
+            <button
+              onClick={() => {
+                addOption({
+                  id: generateWorkbenchId(),
+                  spot,
+                  strike,
+                  expiryYears: expiry,
+                  riskFreeRate: riskFreeRate / 100,
+                  volatility: volatility / 100,
+                  dividendYield: dividendYield / 100,
+                  optionType: optionTypeValue as "call" | "put",
+                  side: "long",
+                  quantity: 10,
+                  premium: priceResult.price,
+                  source: "Option Modeling",
+                });
+                setSent(true);
+              }}
+              className={`mt-3 flex w-full items-center justify-center gap-2 rounded px-3 py-2 text-xs font-medium transition-colors ${
+                sent
+                  ? "bg-[var(--accent-green)]/15 text-[var(--accent-green)] border border-[var(--accent-green)]/30"
+                  : "bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30 hover:bg-[var(--accent-primary)]/25"
+              }`}
+            >
+              {sent ? <Check size={14} /> : <Briefcase size={14} />}
+              {sent ? "Added to Portfolio Workbench" : "Send to Portfolio"}
+            </button>
           </div>
         )}
       </div>
