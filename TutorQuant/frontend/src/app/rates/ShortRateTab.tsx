@@ -6,6 +6,8 @@ import { NumberInput } from "@/components/ui/NumberInput";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
+import { useWorkbench } from "@/context/WorkbenchContext";
+import { Briefcase, Check } from "lucide-react";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -42,6 +44,9 @@ export function ShortRateTab() {
   const [result, setResult] = useState<SimResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sentRate, setSentRate] = useState(false);
+
+  const { setRateAssumption, setProfileRate } = useWorkbench();
 
   const modelMap: Record<string, string> = {
     "Vasicek": "vasicek",
@@ -176,6 +181,34 @@ export function ShortRateTab() {
           <Button onClick={handleSimulate} loading={loading} className="mt-2 w-full">
             Simulate Paths
           </Button>
+
+          {result && (
+            <div className="space-y-2 border-t border-[var(--border-color)] pt-3">
+              <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                Send to Portfolio
+              </p>
+              <button
+                onClick={() => {
+                  // Use terminal mean rate as the risk-free rate assumption
+                  const terminalRate = result.mean_rate[result.mean_rate.length - 1];
+                  setRateAssumption(terminalRate, `${model} (${(terminalRate * 100).toFixed(2)}%)`);
+                  setProfileRate(terminalRate, `${model} (${(terminalRate * 100).toFixed(2)}%)`);
+                  setSentRate(true);
+                  setTimeout(() => setSentRate(false), 2000);
+                }}
+                className={`flex w-full items-center justify-center gap-2 rounded px-3 py-1.5 text-[10px] font-medium transition-colors ${
+                  sentRate
+                    ? "bg-[var(--accent-green)]/15 text-[var(--accent-green)] border border-[var(--accent-green)]/30"
+                    : "bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30 hover:bg-[var(--accent-primary)]/25"
+                }`}
+              >
+                {sentRate ? <Check size={12} /> : <Briefcase size={12} />}
+                {sentRate
+                  ? "Rate Assumption Sent"
+                  : `Use Terminal Rate (${(result.mean_rate[result.mean_rate.length - 1] * 100).toFixed(2)}%) as r`}
+              </button>
+            </div>
+          )}
 
           {error && (
             <div className="rounded border border-[var(--accent-red)]/30 bg-[var(--accent-red)]/10 px-3 py-2 text-xs text-[var(--accent-red)]">

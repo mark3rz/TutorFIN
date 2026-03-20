@@ -12,6 +12,7 @@ from app.routers import (
     encyclopedia,
     fixed_income,
     greeks,
+    market_data,
     monte_carlo,
     options,
     portfolio,
@@ -54,6 +55,7 @@ app.include_router(risk.router)
 app.include_router(calibration.router)
 app.include_router(encyclopedia.router)
 app.include_router(volatility.router)
+app.include_router(market_data.router)
 
 # ── Health check ──────────────────────────────────────────────────────────────
 

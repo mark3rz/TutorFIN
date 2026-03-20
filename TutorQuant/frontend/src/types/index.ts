@@ -36,3 +36,13 @@ export type {
   PortfolioResponse,
   PortfolioRiskMetrics,
 } from "./portfolio";
+
+export type {
+  Quote,
+  HistoryBar,
+  HistoryResponse,
+  OptionQuote,
+  OptionsChain,
+  ExpirationList,
+  TickerSearchResult,
+} from "./market-data";

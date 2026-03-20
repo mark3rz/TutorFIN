@@ -93,6 +93,16 @@ from schemas.volatility import (
     TermStructureRequest,
     TermStructureResponse,
 )
+from schemas.market_data import (
+    QuoteResponse,
+    HistoryBar,
+    HistoryResponse,
+    OptionQuote,
+    OptionsChainResponse,
+    ExpirationResponse,
+    TickerSearchResult,
+    SearchResponse,
+)
 
 __all__ = [
     # instruments
@@ -178,4 +188,13 @@ __all__ = [
     "SmileSliceResponse",
     "TermStructureRequest",
     "TermStructureResponse",
+    # market data
+    "QuoteResponse",
+    "HistoryBar",
+    "HistoryResponse",
+    "OptionQuote",
+    "OptionsChainResponse",
+    "ExpirationResponse",
+    "TickerSearchResult",
+    "SearchResponse",
 ]

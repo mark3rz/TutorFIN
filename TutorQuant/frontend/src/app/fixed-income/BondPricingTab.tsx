@@ -6,6 +6,8 @@ import { NumberInput } from "@/components/ui/NumberInput";
 import { ToggleGroup } from "@/components/ui/ToggleGroup";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
+import { useWorkbench, generateWorkbenchId } from "@/context/WorkbenchContext";
+import { Briefcase, Check } from "lucide-react";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -44,6 +46,9 @@ export function BondPricingTab() {
   const [result, setResult] = useState<BondResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sentBond, setSentBond] = useState(false);
+
+  const { addBond } = useWorkbench();
 
   // YTM solver mode
   const [mode, setMode] = useState("Price from YTM");
@@ -139,6 +144,44 @@ export function BondPricingTab() {
           <Button onClick={handleCompute} loading={loading} className="mt-2 w-full">
             {mode === "Price from YTM" ? "Price Bond" : "Solve YTM"}
           </Button>
+
+          {result && (
+            <div className="space-y-2 border-t border-[var(--border-color)] pt-3">
+              <p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                Send to Portfolio
+              </p>
+              <button
+                onClick={() => {
+                  addBond({
+                    id: generateWorkbenchId(),
+                    faceValue,
+                    couponRate: couponRate / 100,
+                    couponFrequency: freqMap[couponFreq],
+                    maturityYears,
+                    ytm: result.ytm,
+                    cleanPrice: result.clean_price,
+                    dirtyPrice: result.dirty_price,
+                    modifiedDuration: result.modified_duration,
+                    convexity: result.convexity,
+                    dv01: result.dv01,
+                    quantity: 1,
+                    side: "long",
+                    source: "Fixed Income Lab",
+                  });
+                  setSentBond(true);
+                  setTimeout(() => setSentBond(false), 2000);
+                }}
+                className={`flex w-full items-center justify-center gap-2 rounded px-3 py-1.5 text-[10px] font-medium transition-colors ${
+                  sentBond
+                    ? "bg-[var(--accent-green)]/15 text-[var(--accent-green)] border border-[var(--accent-green)]/30"
+                    : "bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30 hover:bg-[var(--accent-primary)]/25"
+                }`}
+              >
+                {sentBond ? <Check size={12} /> : <Briefcase size={12} />}
+                {sentBond ? "Bond Added to Portfolio" : `Send Bond (${result.clean_price.toFixed(2)}) to Portfolio`}
+              </button>
+            </div>
+          )}
 
           {error && (
             <div className="rounded border border-[var(--accent-red)]/30 bg-[var(--accent-red)]/10 px-3 py-2 text-xs text-[var(--accent-red)]">

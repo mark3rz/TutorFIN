@@ -38,3 +38,41 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
+
+/* Range slider styling for Greeks control panel */
+.greek-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-color);
+  outline: none;
+  cursor: pointer;
+}
+.greek-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  border: 2px solid var(--bg-primary);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.greek-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+.greek-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  border: 2px solid var(--bg-primary);
+  cursor: pointer;
+}
+.greek-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-color);
+}

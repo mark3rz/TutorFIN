@@ -14,6 +14,9 @@ import {
   BookOpen,
   Terminal,
 } from "lucide-react";
+import { WorkbenchProvider } from "@/context/WorkbenchContext";
+import { MarketDataProvider } from "@/context/MarketDataContext";
+import { TickerSearchBar } from "@/components/ui/TickerSearchBar";
 
 interface NavItem {
   label: string;
@@ -37,6 +40,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
+    <WorkbenchProvider>
+    <MarketDataProvider>
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
       <aside className="flex w-[220px] flex-col border-r border-[var(--border-color)] bg-[#0a0a0f]">
@@ -98,7 +103,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto bg-[#0e0e14]">{children}</main>
+      <main className="flex flex-1 flex-col overflow-hidden bg-[#0e0e14]">
+        {/* Market Data Toolbar */}
+        <div className="flex items-center justify-end border-b border-[var(--border-color)] bg-[#0a0a0f] px-4 py-1.5">
+          <TickerSearchBar />
+        </div>
+        {/* Page Content */}
+        <div className="flex-1 overflow-y-auto">{children}</div>
+      </main>
     </div>
+    </MarketDataProvider>
+    </WorkbenchProvider>
   );
 }

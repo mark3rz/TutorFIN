@@ -1135,6 +1135,73 @@ export class TutorQuantApi {
   }> {
     return this.requestGet("/api/encyclopedia/categories");
   }
+
+  // ── Market Data ──────────────────────────────────────────────────────
+
+  /** Fetch a real-time quote for a ticker */
+  async getQuote(ticker: string): Promise<{
+    ticker: string;
+    name: string;
+    spot: number;
+    currency: string;
+    change: number;
+    change_pct: number;
+    volume: number;
+    market_cap: number;
+    timestamp: string;
+  }> {
+    return this.requestGet(`/api/market-data/quote?ticker=${encodeURIComponent(ticker)}`);
+  }
+
+  /** Fetch historical OHLCV bars */
+  async getHistory(
+    ticker: string,
+    period: string = "1y",
+    interval: string = "1d",
+  ): Promise<{
+    ticker: string;
+    period: string;
+    interval: string;
+    bars: { date: string; open: number; high: number; low: number; close: number; volume: number }[];
+  }> {
+    const params = new URLSearchParams({ ticker, period, interval });
+    return this.requestGet(`/api/market-data/history?${params.toString()}`);
+  }
+
+  /** Fetch options chain for a specific expiration */
+  async getOptionsChain(
+    ticker: string,
+    expiration: string,
+  ): Promise<{
+    ticker: string;
+    expiration: string;
+    calls: { strike: number; bid: number; ask: number; last: number; volume: number; open_interest: number; implied_vol: number; option_type: string }[];
+    puts: { strike: number; bid: number; ask: number; last: number; volume: number; open_interest: number; implied_vol: number; option_type: string }[];
+  }> {
+    const params = new URLSearchParams({ ticker, expiration });
+    return this.requestGet(`/api/market-data/options?${params.toString()}`);
+  }
+
+  /** Get available option expiration dates */
+  async getExpirations(ticker: string): Promise<{
+    ticker: string;
+    expirations: string[];
+  }> {
+    return this.requestGet(`/api/market-data/expirations?ticker=${encodeURIComponent(ticker)}`);
+  }
+
+  /** Search for ticker symbols */
+  async searchTickers(query: string): Promise<{
+    symbol: string;
+    name: string;
+    exchange: string;
+    instrument_type: string;
+  }[]> {
+    const res = await this.requestGet<{
+      results: { symbol: string; name: string; exchange: string; instrument_type: string }[];
+    }>(`/api/market-data/search?q=${encodeURIComponent(query)}`);
+    return res.results;
+  }
 }
 
 /** Default singleton API client instance */
