@@ -89,6 +89,8 @@
   .pipeline-step.done .step-label { color: #50C878; }
   .pipeline-step.error .step-num { background: #E74C3C; color: #fff; }
   .pipeline-step.error .step-label { color: #E74C3C; }
+  .pipeline-step.skipped .step-num { background: #555; color: #ccc; }
+  .pipeline-step.skipped .step-label { color: #888; }
 
   #pipeline-log {
     background: #0d0f15; border: 1px solid #1e2030; border-radius: 8px;
@@ -373,15 +375,23 @@
         </div>
         <div class="pipeline-step" id="step-ontology">
           <div class="step-num">2</div>
-          <div class="step-label">Ontology Map</div>
+          <div class="step-label">Ontology</div>
         </div>
         <div class="pipeline-step" id="step-schema">
           <div class="step-num">3</div>
-          <div class="step-label">Schema Gen</div>
+          <div class="step-label">Schema</div>
         </div>
-        <div class="pipeline-step" id="step-dataflow">
+        <div class="pipeline-step" id="step-database_create">
           <div class="step-num">4</div>
-          <div class="step-label">Data Flow</div>
+          <div class="step-label">DB Create</div>
+        </div>
+        <div class="pipeline-step" id="step-data_load">
+          <div class="step-num">5</div>
+          <div class="step-label">Load Data</div>
+        </div>
+        <div class="pipeline-step" id="step-embed">
+          <div class="step-num">6</div>
+          <div class="step-label">Embed</div>
         </div>
       </div>
       <div id="pipeline-log"></div>
@@ -498,9 +508,15 @@ async function handleFiles(files) {
   }
 }
 
+const PIPELINE_STEP_IDS = [
+  "step-ingest", "step-ontology", "step-schema",
+  "step-database_create", "step-data_load", "step-embed",
+];
+
 function setStep(stepId, state) {
   const el = document.getElementById(stepId);
-  el.classList.remove("active", "done", "error");
+  if (!el) return;
+  el.classList.remove("active", "done", "error", "skipped");
   if (state) el.classList.add(state);
 }
 
@@ -514,61 +530,106 @@ function addLog(msg, type = "") {
 }
 
 async function runPipeline(file) {
-  // Reset steps
-  ["step-ingest", "step-ontology", "step-schema", "step-dataflow"].forEach(s => setStep(s, ""));
+  // Reset all steps
+  PIPELINE_STEP_IDS.forEach(s => setStep(s, ""));
   document.getElementById("pipeline-log").innerHTML = "";
 
-  // Step 1: Ingest
+  addLog(`Uploading ${file.name} — running full pipeline...`, "info");
   setStep("step-ingest", "active");
-  addLog(`Uploading ${file.name}...`, "info");
 
   try {
+    // Submit to one-click pipeline
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`${API}/ingest`, { method: "POST", body: form });
-    if (!res.ok) throw new Error(`Ingest failed: ${res.status}`);
-    const data = await res.json();
-    addLog(`Ingested: ${data.metadata.filename} | ${data.entities.length} entities | ${data.status}`, "success");
-    setStep("step-ingest", "done");
+    const res = await fetch(`${API}/pipeline/run`, { method: "POST", body: form });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+      throw new Error(typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail));
+    }
 
-    const docId = file.name.replace(/\.[^.]+$/, "");
+    const { job_id, status_url } = await res.json();
+    addLog(`Job ${job_id} queued — polling for updates...`, "info");
 
-    // Step 2: Ontology
-    setStep("step-ontology", "active");
-    addLog("Running ontology mapper...", "info");
-    const ontRes = await fetch(`${API}/ontology/map/${docId}`, { method: "POST" });
-    if (!ontRes.ok) throw new Error(`Ontology mapping failed: ${ontRes.status}`);
-    const ontData = await ontRes.json();
-    addLog(`Mapped ${ontData.records.length} entities, ${ontData.unmapped_count} unmapped`, "success");
-    setStep("step-ontology", "done");
-
-    // Step 3: Schema
-    setStep("step-schema", "active");
-    addLog("Generating schema...", "info");
-    const schemaRes = await fetch(`${API}/schema/generate`, { method: "POST" });
-    if (!schemaRes.ok) throw new Error(`Schema generation failed: ${schemaRes.status}`);
-    const schemaData = await schemaRes.json();
-    addLog(`Generated ${schemaData.tables.length} tables`, "success");
-    setStep("step-schema", "done");
-
-    // Step 4: Data Flow
-    setStep("step-dataflow", "active");
-    addLog("Building data flow graph...", "info");
-    const dfRes = await fetch(`${API}/dataflow/generate`, { method: "POST" });
-    if (!dfRes.ok) throw new Error(`Data flow generation failed: ${dfRes.status}`);
-    const dfData = await dfRes.json();
-    addLog(`Graph: ${dfData.stats.total_types} types, ${dfData.stats.total_entities} entities, ${dfData.stats.total_relationships} relationships`, "success");
-    setStep("step-dataflow", "done");
-
-    addLog("Pipeline complete!", "success");
+    // Poll for status updates
+    await pollPipelineStatus(job_id, status_url);
 
   } catch (err) {
     addLog(err.message, "error");
-    // Mark current active step as error
     document.querySelectorAll(".pipeline-step.active").forEach(s => {
       s.classList.remove("active");
       s.classList.add("error");
     });
+  }
+}
+
+const STEP_MAP = {
+  ingest: "step-ingest",
+  ontology: "step-ontology",
+  schema: "step-schema",
+  database_create: "step-database_create",
+  data_load: "step-data_load",
+  embed: "step-embed",
+};
+
+async function pollPipelineStatus(jobId, statusUrl) {
+  const loggedSteps = new Set();
+  let lastStatus = "";
+
+  while (true) {
+    await new Promise(r => setTimeout(r, 1000));
+
+    try {
+      const res = await fetch(`${API}${statusUrl}`);
+      if (!res.ok) break;
+      const job = await res.json();
+
+      // Update step UI from job status
+      for (const [stepName, stepData] of Object.entries(job.steps)) {
+        const elId = STEP_MAP[stepName];
+        if (!elId) continue;
+
+        if (stepData.status === "success") {
+          setStep(elId, "done");
+          if (!loggedSteps.has(stepName)) {
+            const detail = stepData.detail ? ` — ${JSON.stringify(stepData.detail)}` : "";
+            const ms = stepData.duration_ms ? ` (${stepData.duration_ms}ms)` : "";
+            addLog(`${stepName}: done${ms}${detail}`, "success");
+            loggedSteps.add(stepName);
+          }
+        } else if (stepData.status === "running") {
+          setStep(elId, "active");
+        } else if (stepData.status === "failed") {
+          setStep(elId, "error");
+          if (!loggedSteps.has(stepName)) {
+            addLog(`${stepName}: failed — ${stepData.error || "unknown error"}`, "error");
+            loggedSteps.add(stepName);
+          }
+        } else if (stepData.status === "skipped") {
+          setStep(elId, "done");
+          if (!loggedSteps.has(stepName)) {
+            const reason = stepData.detail?.reason || "skipped";
+            addLog(`${stepName}: skipped (${reason})`, "info");
+            loggedSteps.add(stepName);
+          }
+        }
+      }
+
+      // Check if pipeline finished
+      if (job.status === "completed" || job.status === "partial" || job.status === "failed") {
+        const ms = job.duration_ms ? ` in ${(job.duration_ms / 1000).toFixed(1)}s` : "";
+        if (job.status === "completed") {
+          addLog(`Pipeline complete${ms}!`, "success");
+        } else if (job.status === "partial") {
+          addLog(`Pipeline partially complete${ms} — some steps failed or were skipped.`, "info");
+        } else {
+          addLog(`Pipeline failed${ms}: ${job.error || "check step errors above"}`, "error");
+        }
+        break;
+      }
+    } catch (e) {
+      addLog(`Polling error: ${e.message}`, "error");
+      break;
+    }
   }
 }
 

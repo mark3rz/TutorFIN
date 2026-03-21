@@ -2,6 +2,10 @@
 # ──────────────────────────────────────────────────────────────
 # DataArch.AI — Start Script
 # Installs dependencies, runs tests, and launches the server.
+#
+# Usage:
+#   ./start.sh          Start locally (Python + local/remote PostgreSQL)
+#   ./start.sh docker   Start everything via Docker Compose
 # ──────────────────────────────────────────────────────────────
 
 set -e
@@ -22,6 +26,49 @@ echo -e "${CYAN}${BOLD}  DataArch.AI${NC}"
 echo -e "${CYAN}  AI Data Operating System for Private Equity${NC}"
 echo ""
 
+# ── Docker Mode ─────────────────────────────────────────────
+if [ "${1:-}" = "docker" ]; then
+    echo -e "${CYAN}[docker]${NC} Starting with Docker Compose..."
+    echo ""
+
+    if ! command -v docker &>/dev/null; then
+        echo -e "${RED}Error: Docker is not installed.${NC}"
+        echo "  Install Docker Desktop from https://www.docker.com/products/docker-desktop/"
+        exit 1
+    fi
+
+    if [ ! -f ".env" ]; then
+        if [ -f ".env.example" ]; then
+            echo -e "${YELLOW}No .env file found. Copying from .env.example...${NC}"
+            cp .env.example .env
+            echo -e "${YELLOW}  Please edit .env and add your ANTHROPIC_API_KEY${NC}"
+            echo ""
+        else
+            echo -e "${RED}No .env file found. Create one with at least ANTHROPIC_API_KEY.${NC}"
+            exit 1
+        fi
+    fi
+
+    echo -e "${YELLOW}[..]${NC} Building and starting containers..."
+    docker compose up --build -d
+
+    echo ""
+    echo -e "${GREEN}${BOLD}  DataArch.AI is running!${NC}"
+    echo ""
+    echo -e "  Demo UI:    ${BOLD}http://localhost:${API_PORT:-8000}${NC}"
+    echo -e "  API docs:   ${BOLD}http://localhost:${API_PORT:-8000}/docs${NC}"
+    echo -e "  Health:     ${BOLD}http://localhost:${API_PORT:-8000}/health${NC}"
+    echo -e "  DB Health:  ${BOLD}http://localhost:${API_PORT:-8000}/database/health${NC}"
+    echo ""
+    echo -e "  View logs:  ${BOLD}docker compose logs -f api${NC}"
+    echo -e "  Stop:       ${BOLD}docker compose down${NC}"
+    echo -e "  Reset DB:   ${BOLD}docker compose down -v${NC}"
+    echo ""
+    exit 0
+fi
+
+# ── Local Mode ──────────────────────────────────────────────
+
 # ── 1. Check Python ──────────────────────────────────────────
 PYTHON=""
 for cmd in python3 python; do
@@ -39,6 +86,8 @@ done
 if [ -z "$PYTHON" ]; then
     echo -e "${RED}Error: Python 3.11+ is required.${NC}"
     echo "  Install it from https://www.python.org/downloads/"
+    echo ""
+    echo -e "  Or use Docker mode: ${BOLD}./start.sh docker${NC}"
     exit 1
 fi
 echo -e "${GREEN}[ok]${NC} Python: $($PYTHON --version)"
@@ -66,8 +115,9 @@ if [ ! -f ".env" ]; then
         echo -e "${YELLOW}No .env file found and ANTHROPIC_API_KEY is not set.${NC}"
         echo -e "  The server will start, but document processing requires an API key."
         echo ""
-        echo -e "  To fix: create a .env file with your key:"
-        echo -e "    ${BOLD}echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env${NC}"
+        echo -e "  To fix: copy the example and add your key:"
+        echo -e "    ${BOLD}cp .env.example .env${NC}"
+        echo -e "    ${BOLD}# Edit .env and set ANTHROPIC_API_KEY${NC}"
         echo ""
     else
         echo -e "${GREEN}[ok]${NC} ANTHROPIC_API_KEY found in environment"
@@ -80,14 +130,11 @@ fi
 if [ -z "$DATABASE_URL" ]; then
     DEFAULT_DB="postgresql://dataarch:dataarch@localhost:5432/dataarch"
     echo -e "${YELLOW}[..] DATABASE_URL not set. Using default: ${DEFAULT_DB}${NC}"
-    echo -e "  Database endpoints (POST /database/*) require a running PostgreSQL instance."
+    echo -e "  Database endpoints require a running PostgreSQL instance."
     echo ""
-    echo -e "  Quick setup with Docker:"
-    echo -e "    ${BOLD}docker run -d --name dataarch-pg -p 5432:5432 \\${NC}"
-    echo -e "    ${BOLD}  -e POSTGRES_USER=dataarch \\${NC}"
-    echo -e "    ${BOLD}  -e POSTGRES_PASSWORD=dataarch \\${NC}"
-    echo -e "    ${BOLD}  -e POSTGRES_DB=dataarch \\${NC}"
-    echo -e "    ${BOLD}  postgres:16${NC}"
+    echo -e "  Quick start options:"
+    echo -e "    ${BOLD}./start.sh docker${NC}               # Docker Compose (recommended)"
+    echo -e "    ${BOLD}brew install postgresql@16${NC}       # macOS with Homebrew"
     echo ""
 else
     echo -e "${GREEN}[ok]${NC} DATABASE_URL configured"
@@ -116,6 +163,7 @@ echo -e "  Demo UI:    ${BOLD}http://localhost:${PORT}${NC}"
 echo -e "  API docs:   ${BOLD}http://localhost:${PORT}/docs${NC}"
 echo -e "  Health:     ${BOLD}http://localhost:${PORT}/health${NC}"
 echo -e "  DB Health:  ${BOLD}http://localhost:${PORT}/database/health${NC}"
+echo -e "  Pipeline:   ${BOLD}POST http://localhost:${PORT}/pipeline/run${NC}"
 echo ""
 echo -e "  Press ${BOLD}Ctrl+C${NC} to stop."
 echo ""

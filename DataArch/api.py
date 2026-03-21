@@ -25,6 +25,14 @@ Endpoints:
   GET  /database/stats      Row counts and table sizes
   POST /database/query      Execute read-only SQL query
 
+  POST /pipeline/run        One-click: upload + full pipeline as background job
+  GET  /pipeline/status/{id} Poll pipeline job status
+  GET  /pipeline/jobs       List recent pipeline jobs
+
+  POST /ai/embed            Generate vector embeddings for all entities
+  POST /ai/search           Semantic search across entity data
+  POST /ai/ask              Natural language SQL analytics
+
   GET  /                    Demo UI (Layer 5)
   GET  /static/*            Static file serving for frontend assets
 """
@@ -354,6 +362,77 @@ def database_query(body: dict):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
+
+
+# ── Pipeline Automation (Phase 4) ──────────────────────────────────────────
+
+@app.post("/pipeline/run")
+async def pipeline_run(file: UploadFile = File(...)):
+    """
+    One-click pipeline: upload a document and run the full pipeline.
+
+    Steps: ingest → ontology → schema → database create → data load → embed
+
+    Returns immediately with a job_id. Poll GET /pipeline/status/{job_id} for progress.
+    """
+    from pipeline.pipeline_runner import run_pipeline
+
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported file type '{suffix}'. Supported: {sorted(SUPPORTED_EXTENSIONS)}",
+        )
+
+    # Save upload to a temp file
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        shutil.copyfileobj(file.file, tmp)
+        tmp_path = Path(tmp.name)
+
+    # Rename to preserve original filename
+    named_path = tmp_path.parent / file.filename
+    if named_path.exists():
+        named_path.unlink()
+    tmp_path.rename(named_path)
+
+    # Check if embeddings are available
+    skip_embed = not config.VOYAGE_API_KEY
+
+    job_id = run_pipeline(
+        file_path=named_path,
+        filename=file.filename,
+        skip_embed=skip_embed,
+    )
+
+    return JSONResponse(content={
+        "job_id": job_id,
+        "filename": file.filename,
+        "status": "queued",
+        "status_url": f"/pipeline/status/{job_id}",
+    })
+
+
+@app.get("/pipeline/status/{job_id}")
+def pipeline_status(job_id: str):
+    """
+    Poll the status of a pipeline job.
+
+    Returns the full job state including per-step progress, timing, and errors.
+    """
+    from pipeline.pipeline_runner import get_job
+
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Pipeline job '{job_id}' not found.")
+    return JSONResponse(content=job.to_dict())
+
+
+@app.get("/pipeline/jobs")
+def pipeline_jobs():
+    """List recent pipeline jobs (newest first)."""
+    from pipeline.pipeline_runner import list_jobs
+
+    return JSONResponse(content={"jobs": list_jobs()})
 
 
 # ── AI Integration (Phase 3) ──────────────────────────────────────────────
