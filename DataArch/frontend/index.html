@@ -4,482 +4,501 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DataArch.AI — AI Data Operating System</title>
+<link rel="stylesheet" href="/static/design-system.css">
 <script src="https://d3js.org/d3.v7.min.js"></script>
-<style>
-  /* ── Reset & Base ──────────────────────────────────────── */
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #0f1117; color: #e0e0e0; min-height: 100vh;
-  }
-  a { color: #4A90D9; text-decoration: none; }
-  a:hover { text-decoration: underline; }
-
-  /* ── Top Nav ───────────────────────────────────────────── */
-  nav {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 16px 32px; border-bottom: 1px solid #1e2030;
-    background: #13151f;
-  }
-  nav .brand { font-size: 22px; font-weight: 700; }
-  nav .brand span { color: #4A90D9; }
-  nav .tabs { display: flex; gap: 4px; }
-  nav .tab {
-    padding: 8px 18px; border-radius: 8px; cursor: pointer;
-    font-size: 13px; font-weight: 500; color: #888;
-    background: transparent; border: none; transition: all 0.2s;
-  }
-  nav .tab:hover { color: #ccc; background: #1a1d27; }
-  nav .tab.active { color: #fff; background: #4A90D9; }
-
-  /* ── Layout ────────────────────────────────────────────── */
-  main { padding: 32px; max-width: 1400px; margin: 0 auto; }
-  .page { display: none; }
-  .page.active { display: block; }
-
-  h2 { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
-  h3 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #ccc; }
-
-  /* ── Cards ─────────────────────────────────────────────── */
-  .card {
-    background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px;
-    padding: 24px; margin-bottom: 20px;
-  }
-
-  /* ── Upload Zone ───────────────────────────────────────── */
-  #drop-zone {
-    border: 2px dashed #2a2d3a; border-radius: 12px; padding: 48px;
-    text-align: center; cursor: pointer; transition: all 0.3s;
-    background: #13151f;
-  }
-  #drop-zone:hover, #drop-zone.drag-over {
-    border-color: #4A90D9; background: #151825;
-  }
-  #drop-zone .icon { font-size: 40px; margin-bottom: 12px; }
-  #drop-zone h3 { color: #e0e0e0; margin-bottom: 8px; }
-  #drop-zone p { font-size: 13px; color: #666; }
-  #file-input { display: none; }
-
-  .file-types {
-    display: flex; gap: 8px; justify-content: center; margin-top: 12px;
-  }
-  .file-type-badge {
-    background: #22252f; border: 1px solid #2a2d3a; border-radius: 6px;
-    padding: 3px 10px; font-size: 11px; color: #888;
-  }
-
-  /* ── Pipeline Progress ─────────────────────────────────── */
-  #pipeline-section { display: none; }
-  .pipeline-steps { display: flex; gap: 0; margin-bottom: 20px; }
-  .pipeline-step {
-    flex: 1; text-align: center; padding: 16px 8px; position: relative;
-    background: #1a1d27; border: 1px solid #2a2d3a;
-  }
-  .pipeline-step:first-child { border-radius: 12px 0 0 12px; }
-  .pipeline-step:last-child { border-radius: 0 12px 12px 0; }
-  .pipeline-step .step-num {
-    width: 28px; height: 28px; border-radius: 50%; line-height: 28px;
-    font-size: 13px; font-weight: 700; margin: 0 auto 8px;
-    background: #2a2d3a; color: #888;
-  }
-  .pipeline-step .step-label { font-size: 12px; color: #888; }
-  .pipeline-step.active .step-num { background: #4A90D9; color: #fff; }
-  .pipeline-step.active .step-label { color: #e0e0e0; }
-  .pipeline-step.done .step-num { background: #50C878; color: #fff; }
-  .pipeline-step.done .step-label { color: #50C878; }
-  .pipeline-step.error .step-num { background: #E74C3C; color: #fff; }
-  .pipeline-step.error .step-label { color: #E74C3C; }
-  .pipeline-step.skipped .step-num { background: #555; color: #ccc; }
-  .pipeline-step.skipped .step-label { color: #888; }
-
-  #pipeline-log {
-    background: #0d0f15; border: 1px solid #1e2030; border-radius: 8px;
-    padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
-    max-height: 200px; overflow-y: auto; color: #888;
-  }
-  #pipeline-log .log-line { margin-bottom: 2px; }
-  #pipeline-log .log-success { color: #50C878; }
-  #pipeline-log .log-error { color: #E74C3C; }
-  #pipeline-log .log-info { color: #4A90D9; }
-
-  /* ── Tables ────────────────────────────────────────────── */
-  table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-size: 11px; color: #666; text-transform: uppercase;
-       letter-spacing: 0.05em; padding: 10px 12px; border-bottom: 1px solid #2a2d3a; }
-  td { font-size: 13px; padding: 10px 12px; border-bottom: 1px solid #1e2030; }
-  tr:hover td { background: #1e2030; }
-
-  .badge {
-    display: inline-block; padding: 2px 8px; border-radius: 4px;
-    font-size: 11px; font-weight: 600;
-  }
-  .badge-vendor { background: #1e3454; color: #4A90D9; }
-  .badge-customer { background: #1e4d2b; color: #50C878; }
-  .badge-employee { background: #4d3e1e; color: #F5A623; }
-  .badge-product { background: #3b1e4d; color: #9B59B6; }
-  .badge-transaction { background: #4d1e1e; color: #E74C3C; }
-  .badge-contract { background: #1e4d44; color: #1ABC9C; }
-  .badge-financial_record { background: #4d3b1e; color: #F39C12; }
-  .badge-business_unit { background: #1e3454; color: #3498DB; }
-  .badge-unknown { background: #2a2d3a; color: #95A5A6; }
-
-  .conf-high { color: #50C878; }
-  .conf-medium { color: #F5A623; }
-  .conf-low { color: #E74C3C; }
-
-  /* ── Schema View ───────────────────────────────────────── */
-  .schema-table-card {
-    background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px;
-    padding: 20px; margin-bottom: 16px;
-  }
-  .schema-table-card h3 {
-    font-size: 16px; margin-bottom: 4px;
-  }
-  .schema-table-card .table-meta {
-    font-size: 12px; color: #666; margin-bottom: 12px;
-  }
-  .col-type {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    color: #9B59B6;
-  }
-  .col-pk { color: #F5A623; font-weight: 700; }
-  .col-fk { color: #1ABC9C; }
-  .col-nullable { color: #666; font-style: italic; }
-
-  pre.ddl {
-    background: #0d0f15; border: 1px solid #1e2030; border-radius: 8px;
-    padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
-    overflow-x: auto; color: #ccc; white-space: pre; max-height: 500px;
-    overflow-y: auto;
-  }
-
-  /* ── Data Flow Embed ───────────────────────────────────── */
-  #dataflow-frame {
-    width: 100%; height: 600px; border: 1px solid #2a2d3a;
-    border-radius: 12px; background: #0f1117;
-  }
-
-  /* ── Buttons ───────────────────────────────────────────── */
-  .btn {
-    padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer;
-    font-size: 13px; font-weight: 600; transition: all 0.2s;
-  }
-  .btn-primary { background: #4A90D9; color: #fff; }
-  .btn-primary:hover { background: #3a7bc8; }
-  .btn-primary:disabled { background: #2a3a5a; color: #666; cursor: not-allowed; }
-  .btn-secondary { background: #22252f; color: #ccc; border: 1px solid #2a2d3a; }
-  .btn-secondary:hover { background: #2a2d3a; }
-
-  .btn-group { display: flex; gap: 8px; margin-bottom: 20px; }
-
-  /* ── Spinner ───────────────────────────────────────────── */
-  .spinner {
-    display: inline-block; width: 16px; height: 16px;
-    border: 2px solid #2a2d3a; border-top-color: #4A90D9;
-    border-radius: 50%; animation: spin 0.8s linear infinite;
-    vertical-align: middle; margin-right: 6px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Empty state ───────────────────────────────────────── */
-  .empty {
-    text-align: center; padding: 48px; color: #666;
-  }
-  .empty h3 { font-size: 16px; color: #888; margin-bottom: 8px; }
-
-  /* ── Stats row ─────────────────────────────────────────── */
-  .stats-row { display: flex; gap: 16px; margin-bottom: 24px; }
-  .stat-card {
-    flex: 1; background: #1a1d27; border: 1px solid #2a2d3a;
-    border-radius: 12px; padding: 20px; text-align: center;
-  }
-  .stat-card .stat-value {
-    font-size: 32px; font-weight: 700; color: #4A90D9;
-  }
-  .stat-card .stat-label {
-    font-size: 12px; color: #888; margin-top: 4px;
-  }
-
-  /* ── Search ────────────────────────────────────────────── */
-  .search-bar {
-    width: 100%; padding: 10px 16px; background: #13151f;
-    border: 1px solid #2a2d3a; border-radius: 8px; color: #e0e0e0;
-    font-size: 13px; margin-bottom: 16px; outline: none;
-  }
-  .search-bar:focus { border-color: #4A90D9; }
-  .search-bar::placeholder { color: #555; }
-
-  /* ── Tab content transitions ───────────────────────────── */
-  .fade-in { animation: fadeIn 0.3s ease; }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-  /* ── AI Assistant ────────────────────────────────────────── */
-  .ai-mode-toggle {
-    display: flex; gap: 0; margin-bottom: 20px;
-    background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 10px;
-    overflow: hidden; width: fit-content;
-  }
-  .ai-mode-toggle button {
-    padding: 10px 24px; border: none; cursor: pointer;
-    font-size: 13px; font-weight: 600; color: #888;
-    background: transparent; transition: all 0.2s;
-  }
-  .ai-mode-toggle button:hover { color: #ccc; }
-  .ai-mode-toggle button.active { background: #4A90D9; color: #fff; }
-
-  .ai-chat {
-    display: flex; flex-direction: column; height: calc(100vh - 240px);
-    min-height: 400px;
-  }
-  .ai-messages {
-    flex: 1; overflow-y: auto; padding: 8px 0;
-  }
-  .ai-msg {
-    margin-bottom: 16px; display: flex; gap: 12px;
-    animation: fadeIn 0.3s ease;
-  }
-  .ai-msg-avatar {
-    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; font-weight: 700;
-  }
-  .ai-msg-user .ai-msg-avatar { background: #4A90D9; color: #fff; }
-  .ai-msg-ai .ai-msg-avatar { background: #9B59B6; color: #fff; }
-  .ai-msg-body {
-    flex: 1; background: #1a1d27; border: 1px solid #2a2d3a;
-    border-radius: 12px; padding: 14px 18px; font-size: 14px;
-    line-height: 1.6;
-  }
-  .ai-msg-user .ai-msg-body {
-    background: #1a2a45; border-color: #2a3d5a;
-  }
-  .ai-msg-ai .ai-msg-body {
-    background: #1a1d27;
-  }
-  .ai-msg-body p { margin-bottom: 8px; }
-  .ai-msg-body p:last-child { margin-bottom: 0; }
-
-  .ai-sql-block {
-    background: #0d0f15; border: 1px solid #1e2030; border-radius: 8px;
-    padding: 12px 16px; margin: 10px 0;
-    font-family: 'JetBrains Mono', monospace; font-size: 12px;
-    color: #9B59B6; overflow-x: auto; white-space: pre-wrap;
-  }
-  .ai-sql-label {
-    font-size: 11px; color: #666; text-transform: uppercase;
-    letter-spacing: 0.05em; margin-bottom: 6px; font-family: 'Inter', sans-serif;
-  }
-
-  .ai-results-table {
-    margin-top: 12px; overflow-x: auto;
-  }
-  .ai-results-table table {
-    font-size: 12px;
-  }
-  .ai-results-table th {
-    background: #13151f; font-size: 10px;
-  }
-  .ai-results-table td {
-    font-size: 12px; max-width: 200px; overflow: hidden;
-    text-overflow: ellipsis; white-space: nowrap;
-  }
-
-  .ai-source-card {
-    background: #13151f; border: 1px solid #1e2030; border-radius: 8px;
-    padding: 12px 16px; margin: 6px 0;
-  }
-  .ai-source-card .source-name {
-    font-weight: 600; color: #4A90D9; font-size: 13px;
-  }
-  .ai-source-card .source-type {
-    font-size: 11px; color: #888; margin-top: 2px;
-  }
-  .ai-source-card .source-score {
-    font-size: 11px; color: #50C878; float: right; margin-top: -16px;
-  }
-  .ai-source-card .source-attrs {
-    font-size: 12px; color: #999; margin-top: 6px;
-  }
-
-  .ai-input-row {
-    display: flex; gap: 8px; padding-top: 12px;
-    border-top: 1px solid #1e2030;
-  }
-  .ai-input {
-    flex: 1; padding: 12px 16px; background: #13151f;
-    border: 1px solid #2a2d3a; border-radius: 10px; color: #e0e0e0;
-    font-size: 14px; outline: none; resize: none;
-    font-family: 'Inter', -apple-system, sans-serif;
-  }
-  .ai-input:focus { border-color: #4A90D9; }
-  .ai-input::placeholder { color: #555; }
-  .ai-send {
-    padding: 12px 24px; border-radius: 10px; border: none; cursor: pointer;
-    font-size: 14px; font-weight: 600; background: #4A90D9; color: #fff;
-    transition: background 0.2s;
-  }
-  .ai-send:hover { background: #3a7bc8; }
-  .ai-send:disabled { background: #2a3a5a; color: #666; cursor: not-allowed; }
-
-  .ai-thinking {
-    display: flex; align-items: center; gap: 8px;
-    color: #888; font-size: 13px; padding: 8px 0;
-  }
-  .ai-thinking .spinner { width: 14px; height: 14px; }
-
-  .ai-error {
-    background: #2a1515; border: 1px solid #4d2020; border-radius: 8px;
-    padding: 12px 16px; color: #E74C3C; font-size: 13px; margin: 8px 0;
-  }
-</style>
 </head>
 <body>
 
-<nav>
-  <div class="brand">DataArch<span>.AI</span></div>
-  <div class="tabs">
-    <button class="tab active" data-page="upload">Upload</button>
-    <button class="tab" data-page="registry">Entity Registry</button>
-    <button class="tab" data-page="schema">Schema</button>
-    <button class="tab" data-page="dataflow">Data Flow</button>
-    <button class="tab" data-page="ai">AI Assistant</button>
-  </div>
-</nav>
+<!-- ══════════ Login Screen ══════════ -->
+<div class="da-login-screen" id="login-screen">
+  <div class="da-login-bg" style="background-image: url('/static/photos/christian-ladewig-TTPMpLl_2lc-unsplash.jpg');"></div>
+  <div class="da-login-card">
+    <div class="da-login-logo">DataArch<span class="accent">.AI</span></div>
+    <p class="da-login-subtitle">AI Data Operating System for Private Equity</p>
 
-<main>
-
-  <!-- ════════════════ PAGE: Upload ════════════════ -->
-  <div id="page-upload" class="page active fade-in">
-    <h2>Upload Documents</h2>
-
-    <div id="drop-zone">
-      <div class="icon">&#128196;</div>
-      <h3>Drop files here or click to browse</h3>
-      <p>Supported formats:</p>
-      <div class="file-types">
-        <span class="file-type-badge">PDF</span>
-        <span class="file-type-badge">XLSX</span>
-        <span class="file-type-badge">CSV</span>
-        <span class="file-type-badge">DOCX</span>
-        <span class="file-type-badge">EML</span>
+    <div id="login-form">
+      <div class="da-login-field">
+        <label>Email</label>
+        <input type="email" id="login-email" class="da-input" placeholder="you@company.com" autocomplete="email">
+      </div>
+      <div class="da-login-field">
+        <label>Password</label>
+        <input type="password" id="login-password" class="da-input" placeholder="Enter password" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter') doLogin();">
+      </div>
+      <div id="login-error" class="da-login-error" style="display:none;"></div>
+      <button class="da-btn da-btn-primary" style="width:100%;margin-top:8px;" onclick="doLogin()">Sign In</button>
+      <div class="da-login-toggle">
+        Don't have an account? <a href="#" onclick="showRegister(); return false;">Create one</a>
       </div>
     </div>
-    <input type="file" id="file-input" accept=".pdf,.xlsx,.xlsm,.csv,.docx,.eml" multiple>
 
-    <div id="pipeline-section">
-      <h3 style="margin-top: 24px;">Pipeline Progress</h3>
-      <div class="pipeline-steps">
-        <div class="pipeline-step" id="step-ingest">
-          <div class="step-num">1</div>
-          <div class="step-label">Ingest</div>
-        </div>
-        <div class="pipeline-step" id="step-ontology">
-          <div class="step-num">2</div>
-          <div class="step-label">Ontology</div>
-        </div>
-        <div class="pipeline-step" id="step-schema">
-          <div class="step-num">3</div>
-          <div class="step-label">Schema</div>
-        </div>
-        <div class="pipeline-step" id="step-database_create">
-          <div class="step-num">4</div>
-          <div class="step-label">DB Create</div>
-        </div>
-        <div class="pipeline-step" id="step-data_load">
-          <div class="step-num">5</div>
-          <div class="step-label">Load Data</div>
-        </div>
-        <div class="pipeline-step" id="step-embed">
-          <div class="step-num">6</div>
-          <div class="step-label">Embed</div>
-        </div>
+    <div id="register-form" style="display:none;">
+      <div class="da-login-field">
+        <label>Full Name</label>
+        <input type="text" id="reg-name" class="da-input" placeholder="Jane Smith" autocomplete="name">
       </div>
-      <div id="pipeline-log"></div>
-    </div>
-  </div>
-
-  <!-- ════════════════ PAGE: Entity Registry ════════════════ -->
-  <div id="page-registry" class="page">
-    <h2>Entity Registry</h2>
-    <div id="registry-stats" class="stats-row"></div>
-    <input type="text" class="search-bar" id="registry-search" placeholder="Search entities...">
-    <div class="card">
-      <div id="registry-table-container">
-        <div class="empty"><h3>No entities yet</h3><p>Upload and process documents to populate the registry.</p></div>
+      <div class="da-login-field">
+        <label>Email</label>
+        <input type="email" id="reg-email" class="da-input" placeholder="you@company.com" autocomplete="email">
+      </div>
+      <div class="da-login-field">
+        <label>Password</label>
+        <input type="password" id="reg-password" class="da-input" placeholder="Min 8 characters" autocomplete="new-password"
+               onkeydown="if(event.key==='Enter') doRegister();">
+      </div>
+      <div id="register-error" class="da-login-error" style="display:none;"></div>
+      <button class="da-btn da-btn-primary" style="width:100%;margin-top:8px;" onclick="doRegister()">Create Account</button>
+      <div class="da-login-toggle">
+        Already have an account? <a href="#" onclick="showLogin(); return false;">Sign in</a>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- ════════════════ PAGE: Schema ════════════════ -->
-  <div id="page-schema" class="page">
-    <h2>Generated Schema</h2>
-    <div class="btn-group">
-      <button class="btn btn-secondary" id="btn-view-visual" onclick="setSchemaView('visual')">Visual</button>
-      <button class="btn btn-secondary" id="btn-view-ddl" onclick="setSchemaView('ddl')">DDL</button>
-    </div>
-    <div id="schema-visual"></div>
-    <div id="schema-ddl" style="display:none;"></div>
-  </div>
+<div class="da-app" id="app-shell" style="display:none;">
 
-  <!-- ════════════════ PAGE: Data Flow ════════════════ -->
-  <div id="page-dataflow" class="page">
-    <h2>Data Flow Map</h2>
-    <div class="btn-group">
-      <button class="btn btn-primary" onclick="regenerateDataflow()">Regenerate Graph</button>
-      <button class="btn btn-secondary" onclick="openFullscreen()">Open Fullscreen</button>
-    </div>
-    <iframe id="dataflow-frame" src="/static/dataflow.html" frameborder="0"></iframe>
-  </div>
-
-  <!-- ════════════════ PAGE: AI Assistant ════════════════ -->
-  <div id="page-ai" class="page">
-    <h2>AI Assistant</h2>
-
-    <div class="ai-mode-toggle">
-      <button class="active" data-mode="search" onclick="setAIMode('search')">🔍 Search Documents</button>
-      <button data-mode="ask" onclick="setAIMode('ask')">📊 Query Data</button>
+  <!-- ══════════ Sidebar Navigation ══════════ -->
+  <aside class="da-sidebar da-grain">
+    <div class="da-sidebar-logo">
+      <div class="logo-text">DataArch<span class="accent">.AI</span></div>
     </div>
 
-    <div class="ai-chat">
-      <div class="ai-messages" id="ai-messages">
-        <div class="ai-msg ai-msg-ai">
-          <div class="ai-msg-avatar">AI</div>
-          <div class="ai-msg-body">
-            <p>Welcome to the DataArch AI Assistant! I can help you in two ways:</p>
-            <p><strong>Search Documents</strong> — Find entities across your uploaded documents using natural language. Great for questions like "which vendors have payment terms over 30 days?"</p>
-            <p><strong>Query Data</strong> — Ask business questions and I'll write SQL to query your database. Great for questions like "what is the total transaction volume by vendor?"</p>
-            <p>Choose a mode above and ask away!</p>
+    <nav class="da-sidebar-nav">
+      <div class="da-nav-section-label">Pipeline</div>
+      <button class="da-nav-item active" data-page="upload">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span>Ingestion</span>
+      </button>
+      <button class="da-nav-item" data-page="registry">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <span>Ontology</span>
+      </button>
+      <button class="da-nav-item" data-page="schema">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Schema Builder</span>
+      </button>
+      <button class="da-nav-item" data-page="dataflow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>Data Flow</span>
+      </button>
+
+      <div class="da-nav-section-label" style="margin-top:8px">Intelligence</div>
+      <button class="da-nav-item" data-page="ai">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect x="2" y="2" width="20" height="20" rx="2"/><path d="m18 14-4-4-6.5 6.5"/></svg>
+        <span>AI Analytics</span>
+      </button>
+      <button class="da-nav-item" data-page="portfolio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        <span>Portfolio</span>
+      </button>
+    </nav>
+
+    <div class="da-sidebar-footer">
+      <div class="da-user-badge" id="user-badge" style="display:none;">
+        <div class="da-user-avatar" id="user-avatar"></div>
+        <div class="da-user-info">
+          <div class="da-user-name" id="user-name"></div>
+          <div class="da-user-role" id="user-role"></div>
+        </div>
+        <button class="da-btn-icon" onclick="doLogout()" title="Sign out">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+      <div class="da-version-badge">
+        <span class="da-status-dot" id="status-dot"></span>
+        <span>v0.8.0 &middot; Foundation</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══════════ Main Content ══════════ -->
+  <div class="da-main">
+
+    <!-- ════════════════ VIEW: Ingestion ════════════════ -->
+    <section class="da-view active" id="view-upload">
+
+      <div class="da-hero-header da-grain" style="background-image: url('/static/photos/jeffrey-blum-7-gaPkhIgqs-unsplash.jpg');">
+        <div class="da-h1" style="color:#fff">Upload &amp; Ingest</div>
+        <div class="da-subtitle" style="color:rgba(255,255,255,0.7)">Drop documents to extract entities and build your data architecture</div>
+      </div>
+
+      <div class="da-card da-flex-center da-gap-12 da-mb-16" style="padding:14px 20px;">
+        <label style="font-size:13px;font-weight:600;white-space:nowrap;">Portfolio Company:</label>
+        <select id="upload-company-select" class="da-select" style="flex:1;">
+          <option value="">None (unassigned)</option>
+        </select>
+        <button class="da-btn da-btn-ghost da-btn-sm" onclick="showNewCompanyForm()">+ New Company</button>
+      </div>
+
+      <div id="new-company-form" class="da-card da-mb-16" style="display:none;">
+        <div class="da-card-title">Create New Company</div>
+        <div class="da-flex da-gap-12" style="flex-wrap:wrap;margin-top:8px;">
+          <input id="new-company-name" class="da-input" placeholder="Company name *" style="flex:2;min-width:180px;">
+          <input id="new-company-sector" class="da-input" placeholder="Sector" style="flex:1;min-width:120px;">
+          <input id="new-company-fund" class="da-input" placeholder="Fund" style="flex:1;min-width:120px;">
+          <button class="da-btn da-btn-primary da-btn-sm" onclick="createCompanyFromUpload()">Create</button>
+          <button class="da-btn da-btn-ghost da-btn-sm" onclick="document.getElementById('new-company-form').style.display='none'">Cancel</button>
+        </div>
+      </div>
+
+      <div id="drop-zone" class="da-drop-zone">
+        <div class="da-drop-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--da-text-3)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <h3>Drop files here or click to browse</h3>
+        <p>Supported formats:</p>
+        <div class="da-file-types">
+          <span class="da-file-type-badge">PDF</span>
+          <span class="da-file-type-badge">XLSX</span>
+          <span class="da-file-type-badge">CSV</span>
+          <span class="da-file-type-badge">DOCX</span>
+          <span class="da-file-type-badge">EML</span>
+        </div>
+      </div>
+      <input type="file" id="file-input" accept=".pdf,.xlsx,.xlsm,.csv,.docx,.eml" multiple style="display:none">
+
+      <div id="pipeline-section" style="display:none">
+        <div class="da-card-title da-mt-24">Pipeline Progress</div>
+        <div id="pipeline-steps-wrapper" class="da-pipeline-steps">
+          <div class="da-pipeline-step" id="step-ingest">
+            <div class="step-num">1</div>
+            <div class="step-label">Ingest</div>
+          </div>
+          <div class="da-pipeline-step" id="step-ontology">
+            <div class="step-num">2</div>
+            <div class="step-label">Ontology</div>
+          </div>
+          <div class="da-pipeline-step" id="step-schema">
+            <div class="step-num">3</div>
+            <div class="step-label">Schema</div>
+          </div>
+          <div class="da-pipeline-step" id="step-database_create">
+            <div class="step-num">4</div>
+            <div class="step-label">DB Create</div>
+          </div>
+          <div class="da-pipeline-step" id="step-data_load">
+            <div class="step-num">5</div>
+            <div class="step-label">Load Data</div>
+          </div>
+          <div class="da-pipeline-step" id="step-embed">
+            <div class="step-num">6</div>
+            <div class="step-label">Embed</div>
           </div>
         </div>
+        <div id="pipeline-log" class="da-pipeline-log"></div>
+      </div>
+    </section>
+
+    <!-- ════════════════ VIEW: Ontology / Entity Registry ════════════════ -->
+    <section class="da-view" id="view-registry">
+      <div class="da-page-header">
+        <div class="da-h2">Entity Registry</div>
+        <div class="da-subtitle">All extracted entities across your document corpus</div>
       </div>
 
-      <div class="ai-input-row">
-        <input type="text" class="ai-input" id="ai-input"
-               placeholder="Ask a question about your data..."
-               onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendAIMessage();}">
-        <button class="ai-send" id="ai-send-btn" onclick="sendAIMessage()">Send</button>
-      </div>
-    </div>
-  </div>
+      <div id="registry-stats" class="da-stats-row"></div>
 
-</main>
+      <div class="da-flex da-gap-12 da-mb-16" style="align-items:center;">
+        <input type="text" class="da-input" id="registry-search" placeholder="Search entities..." style="flex:1;">
+        <select id="registry-company-filter" class="da-select" style="min-width:180px;" onchange="filterRegistryByCompany()">
+          <option value="">All Companies</option>
+        </select>
+      </div>
+
+      <div class="da-card">
+        <div id="registry-table-container">
+          <div class="da-empty"><h3>No entities yet</h3><p>Upload and process documents to populate the registry.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════════════ VIEW: Schema Builder ════════════════ -->
+    <section class="da-view" id="view-schema">
+      <div class="da-page-header">
+        <div class="da-h2">Generated Schema</div>
+        <div class="da-subtitle">PostgreSQL DDL auto-generated from your entity registry</div>
+      </div>
+
+      <div class="da-btn-group">
+        <button class="da-btn da-btn-ghost" id="btn-view-visual" onclick="setSchemaView('visual')">Visual</button>
+        <button class="da-btn da-btn-ghost" id="btn-view-ddl" onclick="setSchemaView('ddl')">DDL</button>
+      </div>
+
+      <div id="schema-visual"></div>
+      <div id="schema-ddl" style="display:none;"></div>
+    </section>
+
+    <!-- ════════════════ VIEW: Data Flow ════════════════ -->
+    <section class="da-view da-view-fullbleed" id="view-dataflow">
+      <div class="da-dataflow-panel" style="margin:24px;min-height:calc(100vh - 48px);">
+        <div class="da-dataflow-header">
+          <div class="da-h2" style="color:#fff">Data Flow Map</div>
+          <div class="da-flex da-gap-8">
+            <button class="da-btn da-btn-primary" onclick="regenerateDataflow()">Regenerate Graph</button>
+            <button class="da-btn da-btn-ghost" onclick="openFullscreen()">Open Fullscreen</button>
+          </div>
+        </div>
+        <iframe id="dataflow-frame" src="/static/dataflow.html"></iframe>
+      </div>
+    </section>
+
+    <!-- ════════════════ VIEW: AI Analytics ════════════════ -->
+    <section class="da-view" id="view-ai">
+      <div class="da-page-header">
+        <div class="da-h2">AI Analytics</div>
+        <div class="da-subtitle">Natural language queries across your data</div>
+      </div>
+
+      <div class="da-flex-center da-gap-12 da-mb-16">
+        <label style="font-size:13px;font-weight:600;white-space:nowrap;">Company Context:</label>
+        <select id="ai-company-select" class="da-select" style="flex:1;max-width:320px;">
+          <option value="">All Companies (Portfolio-wide)</option>
+        </select>
+      </div>
+
+      <div class="da-ai-mode-toggle">
+        <button class="active" data-mode="search" onclick="setAIMode('search')">Search Documents</button>
+        <button data-mode="ask" onclick="setAIMode('ask')">Query Data</button>
+      </div>
+
+      <div class="da-ai-chat">
+        <div class="da-ai-messages" id="ai-messages">
+          <div class="da-ai-msg da-ai-msg-ai">
+            <div class="da-ai-msg-avatar">AI</div>
+            <div class="da-ai-msg-body">
+              <p>Welcome to the DataArch AI Assistant. I can help you in two ways:</p>
+              <p><strong>Search Documents</strong> — Find entities across your uploaded documents using natural language.</p>
+              <p><strong>Query Data</strong> — Ask business questions and I'll write SQL to query your database.</p>
+              <p>Choose a mode above and ask away.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="da-ai-input-row">
+          <input type="text" class="da-ai-input" id="ai-input"
+                 placeholder="Ask a question about your data..."
+                 onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendAIMessage();}">
+          <button class="da-ai-send" id="ai-send-btn" onclick="sendAIMessage()">Send</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════════════ VIEW: Portfolio ════════════════ -->
+    <section class="da-view" id="view-portfolio">
+      <div class="da-page-header">
+        <div class="da-h2">Portfolio Intelligence</div>
+        <div class="da-subtitle">Cross-company analysis and entity resolution</div>
+      </div>
+
+      <div id="portfolio-stats" class="da-stats-row"></div>
+
+      <div class="da-card da-mb-16">
+        <div class="da-card-title">Company Comparison</div>
+        <div id="portfolio-company-grid">
+          <div class="da-empty"><h3>No companies yet</h3><p>Create portfolio companies and upload documents to see comparisons.</p></div>
+        </div>
+      </div>
+
+      <div class="da-card">
+        <div class="da-card-title">Vendor Overlap</div>
+        <p style="font-size:13px;color:var(--da-text-2);margin-bottom:12px;">Vendors appearing across multiple portfolio companies</p>
+        <div id="portfolio-vendor-overlap">
+          <div class="da-empty"><p>No vendor overlap data available yet.</p></div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /.da-main -->
+</div><!-- /.da-app -->
+
+<!-- Toast container -->
+<div class="da-toast-container" id="toast-container"></div>
 
 <script>
 const API = window.location.origin;
 
-// ── Tab navigation ──────────────────────────────────────────────────────────
-document.querySelectorAll("nav .tab").forEach(tab => {
-  tab.addEventListener("click", () => {
-    document.querySelectorAll("nav .tab").forEach(t => t.classList.remove("active"));
-    document.querySelectorAll(".page").forEach(p => p.classList.remove("active", "fade-in"));
-    tab.classList.add("active");
-    const page = document.getElementById(`page-${tab.dataset.page}`);
-    page.classList.add("active", "fade-in");
+// ── Authentication ──────────────────────────────────────────────────────────
+let currentUser = null;
+let authToken = localStorage.getItem("da_token");
+
+// Override global fetch to attach auth header
+const _originalFetch = window.fetch;
+window.fetch = function(url, opts = {}) {
+  if (authToken) {
+    opts.headers = opts.headers || {};
+    if (opts.headers instanceof Headers) {
+      opts.headers.set("Authorization", `Bearer ${authToken}`);
+    } else {
+      opts.headers["Authorization"] = `Bearer ${authToken}`;
+    }
+  }
+  return _originalFetch(url, opts);
+};
+
+function showLogin() {
+  document.getElementById("login-form").style.display = "block";
+  document.getElementById("register-form").style.display = "none";
+  document.getElementById("login-error").style.display = "none";
+}
+
+function showRegister() {
+  document.getElementById("login-form").style.display = "none";
+  document.getElementById("register-form").style.display = "block";
+  document.getElementById("register-error").style.display = "none";
+}
+
+async function doLogin() {
+  const email = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+  const errEl = document.getElementById("login-error");
+  errEl.style.display = "none";
+
+  if (!email || !password) {
+    errEl.textContent = "Please enter email and password.";
+    errEl.style.display = "block";
+    return;
+  }
+
+  try {
+    const res = await _originalFetch(`${API}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Login failed" }));
+      errEl.textContent = err.detail || "Login failed";
+      errEl.style.display = "block";
+      return;
+    }
+
+    const data = await res.json();
+    authToken = data.token;
+    currentUser = data.user;
+    localStorage.setItem("da_token", authToken);
+    localStorage.setItem("da_user", JSON.stringify(currentUser));
+    enterApp();
+  } catch (e) {
+    errEl.textContent = "Connection failed. Is the server running?";
+    errEl.style.display = "block";
+  }
+}
+
+async function doRegister() {
+  const full_name = document.getElementById("reg-name").value.trim();
+  const email = document.getElementById("reg-email").value.trim();
+  const password = document.getElementById("reg-password").value;
+  const errEl = document.getElementById("register-error");
+  errEl.style.display = "none";
+
+  if (!full_name || !email || !password) {
+    errEl.textContent = "All fields are required.";
+    errEl.style.display = "block";
+    return;
+  }
+
+  try {
+    const res = await _originalFetch(`${API}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, full_name }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Registration failed" }));
+      errEl.textContent = err.detail || "Registration failed";
+      errEl.style.display = "block";
+      return;
+    }
+
+    const data = await res.json();
+    authToken = data.token;
+    currentUser = data.user;
+    localStorage.setItem("da_token", authToken);
+    localStorage.setItem("da_user", JSON.stringify(currentUser));
+    enterApp();
+  } catch (e) {
+    errEl.textContent = "Connection failed. Is the server running?";
+    errEl.style.display = "block";
+  }
+}
+
+function doLogout() {
+  authToken = null;
+  currentUser = null;
+  localStorage.removeItem("da_token");
+  localStorage.removeItem("da_user");
+  document.getElementById("app-shell").style.display = "none";
+  document.getElementById("login-screen").style.display = "flex";
+  document.getElementById("login-email").value = "";
+  document.getElementById("login-password").value = "";
+  showLogin();
+}
+
+function enterApp() {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("app-shell").style.display = "flex";
+
+  // Show user info in sidebar
+  if (currentUser) {
+    const badge = document.getElementById("user-badge");
+    badge.style.display = "flex";
+    const initials = (currentUser.full_name || "U")
+      .split(" ")
+      .map(w => w[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+    document.getElementById("user-avatar").textContent = initials;
+    document.getElementById("user-name").textContent = currentUser.full_name || currentUser.email;
+    document.getElementById("user-role").textContent = (currentUser.role || "").replace("_", " ");
+  }
+}
+
+// Check for existing session on page load
+(function initAuth() {
+  const savedUser = localStorage.getItem("da_user");
+  if (authToken && savedUser) {
+    try {
+      currentUser = JSON.parse(savedUser);
+      // Verify token is still valid
+      _originalFetch(`${API}/auth/me`, {
+        headers: { "Authorization": `Bearer ${authToken}` },
+      }).then(res => {
+        if (res.ok) {
+          enterApp();
+        } else {
+          doLogout();
+        }
+      }).catch(() => {
+        // Server not reachable — still show app (will fail gracefully)
+        enterApp();
+      });
+    } catch {
+      doLogout();
+    }
+  } else {
+    document.getElementById("login-screen").style.display = "flex";
+  }
+})();
+
+// ── Sidebar navigation ──────────────────────────────────────────────────────
+document.querySelectorAll(".da-nav-item").forEach(item => {
+  item.addEventListener("click", () => {
+    document.querySelectorAll(".da-nav-item").forEach(i => i.classList.remove("active"));
+    document.querySelectorAll(".da-view").forEach(v => v.classList.remove("active"));
+    item.classList.add("active");
+    const view = document.getElementById(`view-${item.dataset.page}`);
+    if (view) view.classList.add("active");
 
     // Load data on tab switch
-    if (tab.dataset.page === "registry") loadRegistry();
-    if (tab.dataset.page === "schema") loadSchema();
-    if (tab.dataset.page === "dataflow") reloadDataflowFrame();
+    if (item.dataset.page === "registry") loadRegistry();
+    if (item.dataset.page === "schema") loadSchema();
+    if (item.dataset.page === "dataflow") reloadDataflowFrame();
+    if (item.dataset.page === "portfolio") loadPortfolio();
+    if (item.dataset.page === "ai") loadCompanySelectors();
   });
 });
 
@@ -503,9 +522,15 @@ async function handleFiles(files) {
   const section = document.getElementById("pipeline-section");
   section.style.display = "block";
 
+  // Add animated border while pipeline runs
+  const wrapper = document.getElementById("pipeline-steps-wrapper");
+  wrapper.classList.add("da-pipeline-active");
+
   for (const file of files) {
     await runPipeline(file);
   }
+
+  wrapper.classList.remove("da-pipeline-active");
 }
 
 const PIPELINE_STEP_IDS = [
@@ -541,6 +566,8 @@ async function runPipeline(file) {
     // Submit to one-click pipeline
     const form = new FormData();
     form.append("file", file);
+    const companyId = document.getElementById("upload-company-select").value;
+    if (companyId) form.append("company_id", companyId);
     const res = await fetch(`${API}/pipeline/run`, { method: "POST", body: form });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
@@ -555,7 +582,7 @@ async function runPipeline(file) {
 
   } catch (err) {
     addLog(err.message, "error");
-    document.querySelectorAll(".pipeline-step.active").forEach(s => {
+    document.querySelectorAll(".da-pipeline-step.active").forEach(s => {
       s.classList.remove("active");
       s.classList.add("error");
     });
@@ -659,38 +686,41 @@ function renderRegistry(data) {
 
   const statsEl = document.getElementById("registry-stats");
   statsEl.innerHTML = `
-    <div class="stat-card">
-      <div class="stat-value">${records.length}</div>
-      <div class="stat-label">Total Entities</div>
+    <div class="da-stat-card accent-blue">
+      <div class="da-stat-value">${records.length}</div>
+      <div class="da-stat-label">Total Entities</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-value">${Object.keys(typeCount).length}</div>
-      <div class="stat-label">Entity Types</div>
+    <div class="da-stat-card accent-purple">
+      <div class="da-stat-value">${Object.keys(typeCount).length}</div>
+      <div class="da-stat-label">Entity Types</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-value">${records.filter(r => r.confidence === "high").length}</div>
-      <div class="stat-label">High Confidence</div>
+    <div class="da-stat-card accent-green">
+      <div class="da-stat-value">${records.filter(r => r.confidence === "high").length}</div>
+      <div class="da-stat-label">High Confidence</div>
     </div>
   `;
 
   const container = document.getElementById("registry-table-container");
   if (records.length === 0) {
-    container.innerHTML = `<div class="empty"><h3>No entities yet</h3><p>Upload and process documents to populate the registry.</p></div>`;
+    container.innerHTML = `<div class="da-empty"><h3>No entities yet</h3><p>Upload and process documents to populate the registry.</p></div>`;
     return;
   }
 
-  let html = `<table>
+  let html = `<table class="da-table">
     <thead><tr>
-      <th>Name</th><th>Type</th><th>Confidence</th><th>Aliases</th><th>Source</th>
+      <th>Name</th><th>Type</th><th>Company</th><th>Confidence</th><th>Aliases</th><th>Source</th>
     </tr></thead><tbody>`;
 
   for (const r of records.sort((a, b) => a.canonical_name.localeCompare(b.canonical_name))) {
-    html += `<tr data-search="${(r.canonical_name + " " + r.ontology_type + " " + (r.aliases || []).join(" ")).toLowerCase()}">
+    const companySlug = r.company_slug || "";
+    const confClass = r.confidence === "high" ? "da-conf-high" : r.confidence === "medium" ? "da-conf-medium" : "da-conf-low";
+    html += `<tr data-search="${(r.canonical_name + " " + r.ontology_type + " " + companySlug + " " + (r.aliases || []).join(" ")).toLowerCase()}" data-company="${companySlug}">
       <td><strong>${r.canonical_name}</strong></td>
-      <td><span class="badge badge-${r.ontology_type}">${r.ontology_type}</span></td>
-      <td><span class="conf-${r.confidence}">${r.confidence}</span></td>
-      <td>${(r.aliases || []).join(", ") || "-"}</td>
-      <td>${r.source_file}</td>
+      <td><span class="da-badge da-badge-${r.ontology_type}">${r.ontology_type}</span></td>
+      <td>${companySlug ? `<span style="color:var(--da-blue);font-size:12px;">${escapeHtml(companySlug)}</span>` : '<span style="color:var(--da-text-3);font-size:12px;">-</span>'}</td>
+      <td><span class="${confClass}">${r.confidence}</span></td>
+      <td style="font-size:12px;color:var(--da-text-2)">${(r.aliases || []).join(", ") || "-"}</td>
+      <td style="font-family:var(--da-font-mono);font-size:11px;color:var(--da-text-2)">${r.source_file}</td>
     </tr>`;
   }
   html += `</tbody></table>`;
@@ -710,10 +740,10 @@ let schemaView = "visual";
 
 function setSchemaView(view) {
   schemaView = view;
-  document.getElementById("btn-view-visual").classList.toggle("btn-primary", view === "visual");
-  document.getElementById("btn-view-visual").classList.toggle("btn-secondary", view !== "visual");
-  document.getElementById("btn-view-ddl").classList.toggle("btn-primary", view === "ddl");
-  document.getElementById("btn-view-ddl").classList.toggle("btn-secondary", view !== "ddl");
+  document.getElementById("btn-view-visual").classList.toggle("da-btn-primary", view === "visual");
+  document.getElementById("btn-view-visual").classList.toggle("da-btn-ghost", view !== "visual");
+  document.getElementById("btn-view-ddl").classList.toggle("da-btn-primary", view === "ddl");
+  document.getElementById("btn-view-ddl").classList.toggle("da-btn-ghost", view !== "ddl");
   document.getElementById("schema-visual").style.display = view === "visual" ? "block" : "none";
   document.getElementById("schema-ddl").style.display = view === "ddl" ? "block" : "none";
 }
@@ -723,8 +753,8 @@ async function loadSchema() {
     // Load JSON schema
     const res = await fetch(`${API}/schema`);
     if (!res.ok) {
-      document.getElementById("schema-visual").innerHTML = `<div class="empty"><h3>No schema generated</h3><p>Upload documents and run the pipeline first.</p></div>`;
-      document.getElementById("schema-ddl").innerHTML = `<div class="empty"><h3>No schema generated</h3></div>`;
+      document.getElementById("schema-visual").innerHTML = `<div class="da-empty"><h3>No schema generated</h3><p>Upload documents and run the pipeline first.</p></div>`;
+      document.getElementById("schema-ddl").innerHTML = `<div class="da-empty"><h3>No schema generated</h3></div>`;
       return;
     }
     const schema = await res.json();
@@ -734,7 +764,7 @@ async function loadSchema() {
     const ddlRes = await fetch(`${API}/schema/sql`);
     if (ddlRes.ok) {
       const ddl = await ddlRes.text();
-      document.getElementById("schema-ddl").innerHTML = `<pre class="ddl">${escapeHtml(ddl)}</pre>`;
+      document.getElementById("schema-ddl").innerHTML = `<pre class="da-ddl">${escapeHtml(ddl)}</pre>`;
     }
   } catch (e) {
     console.error("Failed to load schema:", e);
@@ -747,28 +777,28 @@ function renderSchemaVisual(schema) {
   const container = document.getElementById("schema-visual");
 
   if (!schema.tables || schema.tables.length === 0) {
-    container.innerHTML = `<div class="empty"><h3>No tables generated</h3><p>The entity registry may be empty.</p></div>`;
+    container.innerHTML = `<div class="da-empty"><h3>No tables generated</h3><p>The entity registry may be empty.</p></div>`;
     return;
   }
 
   let html = "";
   for (const table of schema.tables) {
-    html += `<div class="schema-table-card">`;
-    html += `<h3><span class="badge badge-${table.table_name}">${table.table_name}</span></h3>`;
-    html += `<div class="table-meta">${table.record_count} source records | ${table.columns.length} columns</div>`;
-    html += `<table><thead><tr><th>Column</th><th>Type</th><th>Constraints</th></tr></thead><tbody>`;
+    html += `<div class="da-schema-table-card">`;
+    html += `<h3><span class="da-badge da-badge-${table.table_name}">${table.table_name}</span></h3>`;
+    html += `<div class="table-meta">${table.record_count} source records &middot; ${table.columns.length} columns</div>`;
+    html += `<table class="da-table"><thead><tr><th>Column</th><th>Type</th><th>Constraints</th></tr></thead><tbody>`;
 
     for (const col of table.columns) {
       let constraints = [];
-      if (col.primary_key) constraints.push(`<span class="col-pk">PK</span>`);
+      if (col.primary_key) constraints.push(`<span class="da-col-pk">PK</span>`);
       const fk = (table.foreign_keys || []).find(f => f.column === col.name);
-      if (fk) constraints.push(`<span class="col-fk">FK &rarr; ${fk.references_table}</span>`);
+      if (fk) constraints.push(`<span class="da-col-fk">FK &rarr; ${fk.references_table}</span>`);
       if (!col.nullable && !col.primary_key) constraints.push("NOT NULL");
-      if (col.nullable) constraints.push(`<span class="col-nullable">nullable</span>`);
+      if (col.nullable) constraints.push(`<span class="da-col-nullable">nullable</span>`);
 
       html += `<tr>
-        <td>${col.name}</td>
-        <td><span class="col-type">${col.type}</span></td>
+        <td style="font-family:var(--da-font-mono);font-size:12px">${col.name}</td>
+        <td><span class="da-col-type">${col.type}</span></td>
         <td>${constraints.join(" ")}</td>
       </tr>`;
     }
@@ -805,7 +835,7 @@ let aiMode = "search";
 
 function setAIMode(mode) {
   aiMode = mode;
-  document.querySelectorAll(".ai-mode-toggle button").forEach(btn => {
+  document.querySelectorAll(".da-ai-mode-toggle button").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.mode === mode);
   });
   const input = document.getElementById("ai-input");
@@ -820,10 +850,10 @@ function setAIMode(mode) {
 function addAIMessage(role, content) {
   const container = document.getElementById("ai-messages");
   const div = document.createElement("div");
-  div.className = `ai-msg ai-msg-${role}`;
+  div.className = `da-ai-msg da-ai-msg-${role}`;
   div.innerHTML = `
-    <div class="ai-msg-avatar">${role === "user" ? "You" : "AI"}</div>
-    <div class="ai-msg-body">${content}</div>
+    <div class="da-ai-msg-avatar">${role === "user" ? "You" : "AI"}</div>
+    <div class="da-ai-msg-body">${content}</div>
   `;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
@@ -833,9 +863,9 @@ function addAIMessage(role, content) {
 function showAIThinking() {
   const container = document.getElementById("ai-messages");
   const div = document.createElement("div");
-  div.className = "ai-thinking";
+  div.className = "da-ai-thinking";
   div.id = "ai-thinking";
-  div.innerHTML = `<div class="spinner"></div> Thinking...`;
+  div.innerHTML = `<div class="da-spinner"></div> Thinking...`;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
 }
@@ -864,11 +894,11 @@ function formatSearchResults(data) {
       : "";
 
     html += `
-      <div class="ai-source-card">
+      <div class="da-ai-source-card">
         <span class="source-name">${escapeHtml(r.canonical_name || r.name || "Unknown")}</span>
         ${score}
         <div class="source-type">
-          <span class="badge badge-${r.entity_type || r.ontology_type || "unknown"}">${r.entity_type || r.ontology_type || "unknown"}</span>
+          <span class="da-badge da-badge-${r.entity_type || r.ontology_type || "unknown"}">${r.entity_type || r.ontology_type || "unknown"}</span>
           ${r.source_file ? ` &middot; Source: ${escapeHtml(r.source_file)}` : ""}
         </div>
         ${attrStr}
@@ -881,7 +911,7 @@ function formatAskResults(data) {
   let html = "";
 
   if (data.error) {
-    html += `<div class="ai-error">${escapeHtml(data.error)}</div>`;
+    html += `<div class="da-ai-error">${escapeHtml(data.error)}</div>`;
     return html;
   }
 
@@ -893,21 +923,21 @@ function formatAskResults(data) {
   // SQL query
   if (data.sql) {
     html += `
-      <div class="ai-sql-block">
-        <div class="ai-sql-label">Generated SQL</div>
+      <div class="da-ai-sql-block">
+        <div class="da-ai-sql-label">Generated SQL</div>
         ${escapeHtml(data.sql)}
       </div>`;
   }
 
   // Explanation
   if (data.explanation) {
-    html += `<p style="font-size: 12px; color: #888; margin: 4px 0 8px;">${escapeHtml(data.explanation)}</p>`;
+    html += `<p style="font-size: 12px; color: var(--da-text-2); margin: 4px 0 8px;">${escapeHtml(data.explanation)}</p>`;
   }
 
   // Results table
   if (data.rows && data.rows.length > 0) {
     const cols = data.columns || Object.keys(data.rows[0]);
-    html += `<div class="ai-results-table"><table>`;
+    html += `<div class="da-ai-results-table"><table class="da-table">`;
     html += `<thead><tr>${cols.map(c => `<th>${escapeHtml(c)}</th>`).join("")}</tr></thead>`;
     html += `<tbody>`;
     const displayRows = data.rows.slice(0, 20);
@@ -916,7 +946,7 @@ function formatAskResults(data) {
     }
     html += `</tbody></table>`;
     if (data.row_count > 20) {
-      html += `<p style="font-size: 11px; color: #666; margin-top: 8px;">Showing 20 of ${data.row_count} rows</p>`;
+      html += `<p style="font-size: 11px; color: var(--da-text-3); margin-top: 8px;">Showing 20 of ${data.row_count} rows</p>`;
     }
     html += `</div>`;
   }
@@ -940,12 +970,17 @@ async function sendAIMessage() {
 
   try {
     let url, body;
+    const aiCompanyId = document.getElementById("ai-company-select").value || null;
     if (aiMode === "search") {
       url = `${API}/ai/search`;
-      body = JSON.stringify({ query: text });
+      const payload = { query: text };
+      if (aiCompanyId) payload.company_id = parseInt(aiCompanyId);
+      body = JSON.stringify(payload);
     } else {
       url = `${API}/ai/ask`;
-      body = JSON.stringify({ question: text });
+      const payload = { question: text };
+      if (aiCompanyId) payload.company_id = parseInt(aiCompanyId);
+      body = JSON.stringify(payload);
     }
 
     const res = await fetch(url, {
@@ -959,7 +994,7 @@ async function sendAIMessage() {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
       const errMsg = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail);
-      addAIMessage("ai", `<div class="ai-error">${escapeHtml(errMsg)}</div>`);
+      addAIMessage("ai", `<div class="da-ai-error">${escapeHtml(errMsg)}</div>`);
     } else {
       const data = await res.json();
       const content = aiMode === "search"
@@ -970,13 +1005,209 @@ async function sendAIMessage() {
 
   } catch (err) {
     removeAIThinking();
-    addAIMessage("ai", `<div class="ai-error">Request failed: ${escapeHtml(err.message)}</div>`);
+    addAIMessage("ai", `<div class="da-ai-error">Request failed: ${escapeHtml(err.message)}</div>`);
   }
 
   input.disabled = false;
   sendBtn.disabled = false;
   input.focus();
 }
+
+// ── Company Selectors ────────────────────────────────────────────────────────
+let cachedCompanies = null;
+
+async function loadCompanySelectors() {
+  try {
+    const res = await fetch(`${API}/companies`);
+    const data = await res.json();
+    cachedCompanies = data.companies || [];
+    populateCompanyDropdown("upload-company-select", cachedCompanies);
+    populateCompanyDropdown("ai-company-select", cachedCompanies, true);
+    populateCompanyDropdown("registry-company-filter", cachedCompanies, true);
+  } catch (e) {
+    console.error("Failed to load companies:", e);
+  }
+}
+
+function populateCompanyDropdown(selectId, companies, allOption = false) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const currentVal = sel.value;
+  // Keep first option (None / All)
+  while (sel.options.length > 1) sel.remove(1);
+  for (const c of companies) {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = `${c.name}${c.sector ? " (" + c.sector + ")" : ""}`;
+    sel.appendChild(opt);
+  }
+  sel.value = currentVal;
+}
+
+function showNewCompanyForm() {
+  document.getElementById("new-company-form").style.display = "block";
+  document.getElementById("new-company-name").focus();
+}
+
+async function createCompanyFromUpload() {
+  const name = document.getElementById("new-company-name").value.trim();
+  if (!name) return alert("Company name is required.");
+  const sector = document.getElementById("new-company-sector").value.trim();
+  const fund = document.getElementById("new-company-fund").value.trim();
+  try {
+    const res = await fetch(`${API}/companies`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, sector: sector || null, fund: fund || null }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      return alert(err.detail || "Failed to create company");
+    }
+    const company = await res.json();
+    document.getElementById("new-company-form").style.display = "none";
+    document.getElementById("new-company-name").value = "";
+    document.getElementById("new-company-sector").value = "";
+    document.getElementById("new-company-fund").value = "";
+    await loadCompanySelectors();
+    document.getElementById("upload-company-select").value = company.id;
+  } catch (e) {
+    alert("Error creating company: " + e.message);
+  }
+}
+
+function filterRegistryByCompany() {
+  const sel = document.getElementById("registry-company-filter");
+  const companySlug = sel.options[sel.selectedIndex]?.textContent?.split(" (")[0] || "";
+  const filterVal = sel.value;
+  document.querySelectorAll("#registry-table-container tbody tr").forEach(row => {
+    if (!filterVal) { row.style.display = ""; return; }
+    const rowCompany = row.dataset.company || "";
+    // Match by checking if the company slug is in the row data
+    row.style.display = rowCompany ? "" : "none";
+  });
+}
+
+// Load company selectors on page load
+loadCompanySelectors();
+
+// ── Portfolio Dashboard ──────────────────────────────────────────────────────
+async function loadPortfolio() {
+  await loadCompanySelectors();
+  await Promise.all([loadPortfolioSummary(), loadPortfolioGrid(), loadVendorOverlap()]);
+}
+
+async function loadPortfolioSummary() {
+  try {
+    const res = await fetch(`${API}/portfolio/summary`);
+    const data = await res.json();
+    document.getElementById("portfolio-stats").innerHTML = `
+      <div class="da-stat-card accent-blue">
+        <div class="da-stat-value">${data.total_companies || 0}</div>
+        <div class="da-stat-label">Portfolio Companies</div>
+      </div>
+      <div class="da-stat-card accent-teal">
+        <div class="da-stat-value">${data.total_entities || 0}</div>
+        <div class="da-stat-label">Total Entities</div>
+      </div>
+      <div class="da-stat-card accent-purple">
+        <div class="da-stat-value">${data.total_documents || 0}</div>
+        <div class="da-stat-label">Documents Processed</div>
+      </div>
+      <div class="da-stat-card accent-green">
+        <div class="da-stat-value">${Object.values(data.entity_counts || {}).filter(v => v > 0).length}</div>
+        <div class="da-stat-label">Active Entity Types</div>
+      </div>
+    `;
+  } catch (e) {
+    console.error("Failed to load portfolio summary:", e);
+  }
+}
+
+async function loadPortfolioGrid() {
+  const container = document.getElementById("portfolio-company-grid");
+  if (!cachedCompanies || cachedCompanies.length === 0) {
+    container.innerHTML = `<div class="da-empty"><h3>No companies yet</h3><p>Create portfolio companies and upload documents to see comparisons.</p></div>`;
+    return;
+  }
+
+  const entityTypes = ["vendor", "customer", "employee", "product", "transaction", "contract", "financial_record", "business_unit"];
+
+  // Load details for each company
+  const companyDetails = [];
+  for (const c of cachedCompanies) {
+    try {
+      const res = await fetch(`${API}/portfolio/company/${c.id}/detail`);
+      const data = await res.json();
+      companyDetails.push({ company: c, counts: data.entity_counts || {}, total: data.total_entities || 0 });
+    } catch {
+      companyDetails.push({ company: c, counts: {}, total: 0 });
+    }
+  }
+
+  let html = `<div class="da-company-grid"><table class="da-table">`;
+  html += `<thead><tr><th>Company</th><th>Sector</th><th>Status</th>`;
+  entityTypes.forEach(t => { html += `<th>${t.replace("_", " ")}</th>`; });
+  html += `<th>Total</th></tr></thead><tbody>`;
+
+  for (const cd of companyDetails) {
+    html += `<tr>`;
+    html += `<td>${escapeHtml(cd.company.name)}</td>`;
+    html += `<td style="color:var(--da-text-2);font-size:12px;">${cd.company.sector || "-"}</td>`;
+    html += `<td><span class="da-badge da-badge-${cd.company.status === "active" ? "active" : "exited"}">${cd.company.status || "active"}</span></td>`;
+    entityTypes.forEach(t => {
+      const count = cd.counts[t] || 0;
+      html += `<td class="count-cell ${count > 0 ? "has-data" : ""}">${count}</td>`;
+    });
+    html += `<td class="count-cell has-data" style="font-weight:700;">${cd.total}</td>`;
+    html += `</tr>`;
+  }
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
+}
+
+async function loadVendorOverlap() {
+  const container = document.getElementById("portfolio-vendor-overlap");
+  try {
+    const res = await fetch(`${API}/portfolio/vendor-overlap?min_companies=2`);
+    const data = await res.json();
+    const overlaps = data.overlaps || [];
+    if (overlaps.length === 0) {
+      container.innerHTML = `<div class="da-empty"><p>No vendors appear across multiple companies yet.</p></div>`;
+      return;
+    }
+    let html = "";
+    for (const o of overlaps) {
+      html += `<div class="da-overlap-card">
+        <div>
+          <div class="vendor-name">${escapeHtml(o.vendor_name)}</div>
+          <div class="company-list">${(o.companies || []).map(c => escapeHtml(c)).join(" &middot; ")}</div>
+        </div>
+        <div class="company-count">${o.company_count} companies</div>
+      </div>`;
+    }
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div class="da-empty"><p>Could not load vendor overlap data.</p></div>`;
+  }
+}
+
+// ── Connection Status Check ──────────────────────────────────────────────────
+async function checkHealth() {
+  const dot = document.getElementById("status-dot");
+  try {
+    const res = await fetch(`${API}/health`);
+    if (res.ok) {
+      dot.classList.remove("offline");
+    } else {
+      dot.classList.add("offline");
+    }
+  } catch {
+    dot.classList.add("offline");
+  }
+}
+checkHealth();
+setInterval(checkHealth, 30000);
 </script>
 </body>
 </html>

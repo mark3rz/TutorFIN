@@ -20,6 +20,7 @@ from pipeline.database import (
     _quote_identifier,
     _mask_url,
     execute_readonly_query,
+    ENTITY_TABLES,
 )
 
 
@@ -208,3 +209,51 @@ def test_query_blocks_select_with_embedded_delete():
     """SELECT with embedded dangerous keywords should be blocked."""
     with pytest.raises(ValueError, match="disallowed keyword"):
         execute_readonly_query("SELECT * FROM vendor; DELETE FROM vendor")
+
+
+# ── Phase 5: Functional index DDL ─────────────────────────────────────────
+
+def test_index_ddl_functional():
+    """Functional indexes should use the expression directly."""
+    idx_def = {
+        "columns": ["canonical_name", "company_id"],
+        "unique": True,
+        "functional": True,
+        "expression": "CREATE UNIQUE INDEX IF NOT EXISTS idx_{table}_canonical_company "
+                      "ON {table} (canonical_name, COALESCE(company_id, -1))",
+    }
+    ddl = _index_to_ddl("vendor", idx_def)
+    assert "idx_vendor_canonical_company" in ddl
+    assert "COALESCE(company_id, -1)" in ddl
+    assert "CREATE UNIQUE INDEX IF NOT EXISTS" in ddl
+
+
+def test_entity_tables_list():
+    """ENTITY_TABLES should include all 8 PE ontology types."""
+    assert len(ENTITY_TABLES) == 8
+    assert "vendor" in ENTITY_TABLES
+    assert "customer" in ENTITY_TABLES
+    assert "employee" in ENTITY_TABLES
+    assert "product" in ENTITY_TABLES
+    assert "transaction" in ENTITY_TABLES
+    assert "contract" in ENTITY_TABLES
+    assert "financial_record" in ENTITY_TABLES
+    assert "business_unit" in ENTITY_TABLES
+
+
+def test_table_ddl_with_company_id():
+    """Entity tables should include company_id column with FK to portfolio_company."""
+    table_def = {
+        "table_name": "vendor",
+        "columns": [
+            {"name": "id", "type": "BIGSERIAL", "nullable": False, "primary_key": True},
+            {"name": "canonical_name", "type": "VARCHAR(255)", "nullable": False, "primary_key": False},
+            {"name": "company_id", "type": "BIGINT", "nullable": True, "primary_key": False},
+        ],
+        "foreign_keys": [
+            {"column": "company_id", "references_table": "portfolio_company", "references_column": "id"},
+        ],
+    }
+    ddl = _table_to_ddl(table_def)
+    assert "company_id BIGINT" in ddl
+    assert "FOREIGN KEY (company_id) REFERENCES portfolio_company(id)" in ddl

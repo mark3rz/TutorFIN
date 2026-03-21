@@ -21,6 +21,7 @@ Fixes (Phase 1.1):
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 from collections import defaultdict
@@ -117,18 +118,65 @@ def infer_sql_type(values: list[Any]) -> str:
     return "VARCHAR(255)"
 
 
-# ── Foreign key relationships ────────────────────────────────────────────────
+# ── Foreign key relationships (loaded from DB via ontology_service) ───────────
 
-# Known FK relationships in the PE ontology
-# (child_table, column_name) → parent_table
-FK_RULES: dict[tuple[str, str], str] = {
-    ("transaction", "vendor_id"):    "vendor",
-    ("transaction", "customer_id"):  "customer",
-    ("transaction", "product_id"):   "product",
-    ("contract", "vendor_id"):       "vendor",
-    ("contract", "customer_id"):     "customer",
-    ("employee", "department"):      "business_unit",
-    ("product", "vendor_id"):        "vendor",
+def _get_fk_rules() -> dict[tuple[str, str], str]:
+    """Load FK rules from database, with hardcoded fallback."""
+    try:
+        from services.ontology_service import get_fk_rules_dict
+        return get_fk_rules_dict()
+    except Exception:
+        return {
+            ("transaction", "vendor_id"):    "vendor",
+            ("transaction", "customer_id"):  "customer",
+            ("transaction", "product_id"):   "product",
+            ("contract", "vendor_id"):       "vendor",
+            ("contract", "customer_id"):     "customer",
+            ("employee", "department"):      "business_unit",
+            ("product", "vendor_id"):        "vendor",
+        }
+
+def _get_company_fk_rules() -> dict[str, str]:
+    """Load company FK rules from database, with hardcoded fallback."""
+    try:
+        from services.ontology_service import get_company_fk_rules
+        return get_company_fk_rules()
+    except Exception:
+        return {
+            "vendor": "portfolio_company", "customer": "portfolio_company",
+            "employee": "portfolio_company", "product": "portfolio_company",
+            "transaction": "portfolio_company", "contract": "portfolio_company",
+            "financial_record": "portfolio_company", "business_unit": "portfolio_company",
+        }
+
+# Module-level aliases for backward compatibility
+FK_RULES = None  # Lazy-loaded; use _get_fk_rules() directly
+COMPANY_FK_RULES = None  # Lazy-loaded; use _get_company_fk_rules() directly
+
+# The portfolio_company system table definition (Phase 5)
+PORTFOLIO_COMPANY_TABLE: dict = {
+    "table_name": "portfolio_company",
+    "record_count": 0,
+    "system_table": True,
+    "columns": [
+        {"name": "id", "type": "BIGSERIAL", "nullable": False, "primary_key": True},
+        {"name": "name", "type": "VARCHAR(255)", "nullable": False, "primary_key": False, "unique": True},
+        {"name": "slug", "type": "VARCHAR(100)", "nullable": False, "primary_key": False, "unique": True},
+        {"name": "sector", "type": "VARCHAR(255)", "nullable": True, "primary_key": False},
+        {"name": "acquisition_date", "type": "DATE", "nullable": True, "primary_key": False},
+        {"name": "hold_period_years", "type": "DECIMAL(4,1)", "nullable": True, "primary_key": False},
+        {"name": "fund", "type": "VARCHAR(255)", "nullable": True, "primary_key": False},
+        {"name": "status", "type": "VARCHAR(50)", "nullable": True, "primary_key": False, "default": "'active'"},
+        {"name": "notes", "type": "TEXT", "nullable": True, "primary_key": False},
+        {"name": "created_at", "type": "TIMESTAMP", "nullable": False, "primary_key": False, "default": "NOW()"},
+        {"name": "updated_at", "type": "TIMESTAMP", "nullable": False, "primary_key": False, "default": "NOW()"},
+    ],
+    "foreign_keys": [],
+    "indexes": [
+        {"columns": ["name"], "unique": True},
+        {"columns": ["slug"], "unique": True},
+        {"columns": ["status"], "unique": False},
+    ],
 }
 
 
@@ -204,6 +252,11 @@ def generate_schema(registry: EntityRegistry) -> dict:
       - version: schema version string
       - generated_at: timestamp
       - tables: list of table definitions (topologically sorted)
+
+    Phase 5 additions:
+      - portfolio_company system table is always included
+      - Every entity table gets a company_id BIGINT FK column
+      - Unique constraint on canonical_name becomes composite (canonical_name + company_id)
     """
     # Group records by ontology type and collect all attribute values
     type_attrs: dict[str, dict[str, list[Any]]] = defaultdict(lambda: defaultdict(list))
@@ -234,13 +287,19 @@ def generate_schema(registry: EntityRegistry) -> dict:
                 "type": "VARCHAR(255)",
                 "nullable": False,
                 "primary_key": False,
-                "unique": True,
+                # No column-level UNIQUE — composite unique via index (Phase 5)
+            },
+            {
+                "name": "company_id",
+                "type": "BIGINT",
+                "nullable": True,
+                "primary_key": False,
             },
         ]
 
         for attr_key in sorted(attrs.keys()):
             col_name = _sanitize_column_name(attr_key)
-            if col_name in ("id", "canonical_name"):
+            if col_name in ("id", "canonical_name", "company_id"):
                 continue
             values = attrs[attr_key]
             sql_type = infer_sql_type(values)
@@ -266,7 +325,7 @@ def generate_schema(registry: EntityRegistry) -> dict:
         # Determine foreign keys for this table
         # FK references canonical_name (VARCHAR) on the parent table, not id (BIGSERIAL)
         foreign_keys = []
-        for (child, col), parent in FK_RULES.items():
+        for (child, col), parent in _get_fk_rules().items():
             if child == table_name and any(c["name"] == col for c in columns):
                 foreign_keys.append({
                     "column": col,
@@ -274,12 +333,26 @@ def generate_schema(registry: EntityRegistry) -> dict:
                     "references_column": "canonical_name",
                 })
 
-        # Determine indexes (FK columns + canonical_name)
+        # Add company_id FK → portfolio_company.id (Phase 5)
+        if table_name in _get_company_fk_rules():
+            foreign_keys.append({
+                "column": "company_id",
+                "references_table": "portfolio_company",
+                "references_column": "id",
+            })
+
+        # Indexes: composite unique on (canonical_name, company_id), FK indexes
         indexes = [
-            {"columns": ["canonical_name"], "unique": True},
+            # Composite unique using COALESCE for NULL handling (Phase 5)
+            {"columns": ["canonical_name", "company_id"], "unique": True,
+             "functional": True,
+             "expression": "CREATE UNIQUE INDEX IF NOT EXISTS idx_{table}_canonical_company "
+                           "ON {table} (canonical_name, COALESCE(company_id, -1))"},
+            {"columns": ["company_id"], "unique": False},
         ]
         for fk in foreign_keys:
-            indexes.append({"columns": [fk["column"]], "unique": False})
+            if fk["column"] != "company_id":  # already added above
+                indexes.append({"columns": [fk["column"]], "unique": False})
 
         tables.append({
             "table_name": table_name,
@@ -289,11 +362,14 @@ def generate_schema(registry: EntityRegistry) -> dict:
             "indexes": indexes,
         })
 
+    # Prepend portfolio_company system table (Phase 5)
+    tables.insert(0, copy.deepcopy(PORTFOLIO_COMPANY_TABLE))
+
     # Topological sort: parents before children
     tables = _topological_sort(tables)
 
     return {
-        "version": "1.1",
+        "version": "2.0",
         "generated_at": datetime.utcnow().isoformat(),
         "tables": tables,
     }
@@ -357,12 +433,17 @@ def schema_to_ddl(schema: dict) -> str:
 
         # Collect indexes for after table creation
         for idx in table.get("indexes", []):
-            idx_cols = [_quote_identifier(c) for c in idx["columns"]]
-            idx_name = f"idx_{tname}_{'_'.join(idx['columns'])}"
-            unique_kw = "UNIQUE " if idx.get("unique") else ""
-            all_indexes.append(
-                f"CREATE {unique_kw}INDEX IF NOT EXISTS {idx_name} ON {quoted_tname} ({', '.join(idx_cols)});"
-            )
+            if idx.get("functional"):
+                # Functional index with custom expression (e.g., COALESCE for composite unique)
+                expr = idx["expression"].replace("{table}", tname)
+                all_indexes.append(f"{expr};")
+            else:
+                idx_cols = [_quote_identifier(c) for c in idx["columns"]]
+                idx_name = f"idx_{tname}_{'_'.join(idx['columns'])}"
+                unique_kw = "UNIQUE " if idx.get("unique") else ""
+                all_indexes.append(
+                    f"CREATE {unique_kw}INDEX IF NOT EXISTS {idx_name} ON {quoted_tname} ({', '.join(idx_cols)});"
+                )
 
     # Add all indexes at the end
     if all_indexes:

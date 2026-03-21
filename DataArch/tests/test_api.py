@@ -112,3 +112,99 @@ def test_ingest_unsupported_type():
         files={"file": ("test.xyz", BytesIO(b"hello"), "application/octet-stream")},
     )
     assert res.status_code == 415
+
+
+# ── Phase 5: Company CRUD endpoints ─────────────────────────────────────────
+
+def test_create_company_missing_name():
+    """POST /companies should 400 if name is missing."""
+    res = client.post("/companies", json={})
+    assert res.status_code == 400
+    assert "name" in res.json()["detail"].lower()
+
+
+def test_create_company_success():
+    """POST /companies should create a company when DB is available."""
+    from unittest.mock import MagicMock, patch
+    from pipeline.company import PortfolioCompany
+
+    mock_company = PortfolioCompany(
+        id=1, name="Test Corp", slug="test-corp", status="active",
+    )
+
+    with patch("api.create_company", return_value=mock_company):
+        res = client.post("/companies", json={"name": "Test Corp", "sector": "Technology"})
+        assert res.status_code == 201
+        data = res.json()
+        assert data["name"] == "Test Corp"
+        assert data["slug"] == "test-corp"
+
+
+def test_list_companies_success():
+    """GET /companies should return company list."""
+    from unittest.mock import patch
+    from pipeline.company import PortfolioCompany
+
+    mock_companies = [
+        PortfolioCompany(id=1, name="A Corp", slug="a-corp"),
+        PortfolioCompany(id=2, name="B Corp", slug="b-corp"),
+    ]
+
+    with patch("api.list_companies", return_value=mock_companies):
+        res = client.get("/companies")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["count"] == 2
+        assert len(data["companies"]) == 2
+
+
+def test_get_company_not_found():
+    """GET /companies/{id} should 404 for nonexistent company."""
+    with patch("api.get_company", return_value=None):
+        res = client.get("/companies/999")
+        assert res.status_code == 404
+
+
+def test_get_company_success():
+    """GET /companies/{id} should return company details."""
+    from pipeline.company import PortfolioCompany
+
+    mock_company = PortfolioCompany(id=1, name="Acme", slug="acme", sector="Tech")
+
+    with patch("api.get_company", return_value=mock_company):
+        res = client.get("/companies/1")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["name"] == "Acme"
+        assert data["sector"] == "Tech"
+
+
+def test_update_company_not_found():
+    """PUT /companies/{id} should 404 for nonexistent company."""
+    with patch("api.update_company", return_value=None):
+        res = client.put("/companies/999", json={"sector": "FinTech"})
+        assert res.status_code == 404
+
+
+def test_update_company_success():
+    """PUT /companies/{id} should update and return company."""
+    from pipeline.company import PortfolioCompany
+
+    mock_company = PortfolioCompany(
+        id=1, name="Acme", slug="acme", sector="FinTech", status="active",
+    )
+
+    with patch("api.update_company", return_value=mock_company):
+        res = client.put("/companies/1", json={"sector": "FinTech"})
+        assert res.status_code == 200
+        assert res.json()["sector"] == "FinTech"
+
+
+def test_pipeline_run_unsupported_type():
+    """POST /pipeline/run should reject unsupported file types."""
+    from io import BytesIO
+    res = client.post(
+        "/pipeline/run",
+        files={"file": ("test.xyz", BytesIO(b"hello"), "application/octet-stream")},
+    )
+    assert res.status_code == 415

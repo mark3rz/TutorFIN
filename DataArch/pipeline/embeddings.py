@@ -38,13 +38,19 @@ def entity_to_text(record) -> str:
     """
     Convert an entity record to a text representation for embedding.
 
-    Combines the canonical name, type, and all attributes into a single
-    text string that captures the entity's semantic meaning.
+    Combines the canonical name, type, company context, and all attributes
+    into a single text string that captures the entity's semantic meaning.
+
+    Phase 5: includes company_slug for portfolio-aware embeddings.
     """
     parts = [
         f"Type: {record.ontology_type.value}",
         f"Name: {record.canonical_name}",
     ]
+
+    # Phase 5: include company context if available
+    if getattr(record, "company_slug", None):
+        parts.append(f"Company: {record.company_slug}")
 
     if record.aliases:
         parts.append(f"Also known as: {', '.join(record.aliases)}")
@@ -191,6 +197,7 @@ def setup_pgvector(engine: Engine | None = None) -> dict:
 def embed_all_entities(
     registry: EntityRegistry | None = None,
     engine: Engine | None = None,
+    company_id: int | None = None,
 ) -> dict:
     """
     Generate embeddings for all entities and store them in PostgreSQL.
@@ -200,6 +207,12 @@ def embed_all_entities(
       2. Convert each entity to text
       3. Generate embeddings via Voyage AI
       4. UPDATE each row's embedding column in PostgreSQL
+
+    Args:
+        registry: Entity registry (loads from disk if None)
+        engine: SQLAlchemy engine (uses default if None)
+        company_id: If set, scope UPDATE to match on both canonical_name
+                    and company_id (Phase 5)
 
     Returns:
         {
@@ -256,10 +269,18 @@ def embed_all_entities(
                 # Format embedding as PostgreSQL vector string
                 vec_str = "[" + ",".join(str(v) for v in embedding) + "]"
 
-                conn.execute(text(
-                    f"UPDATE {quoted} SET embedding = :vec "
-                    f"WHERE canonical_name = :name"
-                ), {"vec": vec_str, "name": record.canonical_name})
+                # Phase 5: scope UPDATE to company_id when set
+                if company_id is not None:
+                    conn.execute(text(
+                        f"UPDATE {quoted} SET embedding = :vec "
+                        f"WHERE canonical_name = :name AND company_id = :company_id"
+                    ), {"vec": vec_str, "name": record.canonical_name,
+                        "company_id": company_id})
+                else:
+                    conn.execute(text(
+                        f"UPDATE {quoted} SET embedding = :vec "
+                        f"WHERE canonical_name = :name AND company_id IS NULL"
+                    ), {"vec": vec_str, "name": record.canonical_name})
 
                 results["embedded"] += 1
             except Exception as e:

@@ -14,6 +14,13 @@ from datetime import datetime
 
 
 class OntologyType(str, Enum):
+    """Canonical ontology types.
+
+    NOTE: As of v0.8.0 the authoritative source of ontology types is the
+    `ontology_types` database table, accessed via `services.ontology_service`.
+    This enum is kept for backward compatibility with code that uses
+    OntologyType.VENDOR etc.  New code should use the service layer.
+    """
     VENDOR          = "vendor"
     CUSTOMER        = "customer"
     EMPLOYEE        = "employee"
@@ -23,6 +30,13 @@ class OntologyType(str, Enum):
     FINANCIAL_RECORD = "financial_record"
     BUSINESS_UNIT   = "business_unit"
     UNKNOWN         = "unknown"
+
+    @classmethod
+    def _missing_(cls, value: str):
+        """Allow any string value so DB-defined types work at runtime."""
+        obj = str.__new__(cls, value)
+        obj._value_ = value
+        return obj
 
 
 class MappingConfidence(str, Enum):
@@ -49,6 +63,9 @@ class OntologyRecord(BaseModel):
     source_entity_type: str              # what the parser originally called it
     source_attributes: dict[str, Any] = Field(default_factory=dict)
 
+    # Portfolio company association (V2 — Phase 5)
+    company_slug: str | None = None      # URL-safe company identifier
+
     # Normalised attributes (type-specific, populated by classifier)
     attributes: dict[str, Any] = Field(default_factory=dict)
 
@@ -62,6 +79,7 @@ class OntologyResult(BaseModel):
     Full output of mapping a single ParsedDocument through the ontology mapper.
     """
     source_file: str
+    company_slug: str | None = None      # portfolio company this document belongs to
     records: list[OntologyRecord] = Field(default_factory=list)
     unmapped_count: int = 0        # entities that couldn't be confidently mapped
     mapped_at: datetime = Field(default_factory=datetime.utcnow)

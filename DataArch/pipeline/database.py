@@ -215,11 +215,120 @@ def _table_to_ddl(table_def: dict) -> str:
 
 def _index_to_ddl(table_name: str, idx_def: dict) -> str:
     """Generate CREATE INDEX IF NOT EXISTS DDL for a single index definition."""
+    if idx_def.get("functional"):
+        # Functional index with custom expression (e.g., COALESCE composite unique)
+        expr = idx_def["expression"].replace("{table}", table_name)
+        return f"{expr};"
     quoted_table = _quote_identifier(table_name)
     idx_cols = [_quote_identifier(c) for c in idx_def["columns"]]
     idx_name = f"idx_{table_name}_{'_'.join(idx_def['columns'])}"
     unique_kw = "UNIQUE " if idx_def.get("unique") else ""
     return f"CREATE {unique_kw}INDEX IF NOT EXISTS {idx_name} ON {quoted_table} ({', '.join(idx_cols)});"
+
+
+# ── V2 Migration: Portfolio Company Support ─────────────────────────────────
+
+# Entity tables (loaded from DB via ontology_service, with hardcoded fallback)
+def _get_entity_tables() -> list[str]:
+    try:
+        from services.ontology_service import get_entity_table_names
+        return get_entity_table_names()
+    except Exception:
+        return [
+            "vendor", "customer", "employee", "product",
+            "transaction", "contract", "financial_record", "business_unit",
+        ]
+
+ENTITY_TABLES = _get_entity_tables()  # cached at import time for backward compat
+
+
+def ensure_company_column(engine: Engine | None = None) -> dict:
+    """
+    Add company_id BIGINT column to all entity tables if it doesn't exist.
+    Idempotent — uses ADD COLUMN IF NOT EXISTS.
+
+    Returns: {"columns_added": [...], "errors": [...]}
+    """
+    engine = engine or get_engine()
+    result = {"columns_added": [], "errors": []}
+
+    with engine.begin() as conn:
+        for table_name in ENTITY_TABLES:
+            quoted = _quote_identifier(table_name)
+            try:
+                conn.execute(text(
+                    f"ALTER TABLE {quoted} ADD COLUMN IF NOT EXISTS "
+                    f"company_id BIGINT REFERENCES portfolio_company(id)"
+                ))
+                result["columns_added"].append(table_name)
+                logger.info(f"Ensured company_id on '{table_name}'.")
+            except (ProgrammingError, OperationalError) as e:
+                # Table might not exist yet — that's OK
+                result["errors"].append({
+                    "table": table_name,
+                    "error": str(e).split("\n")[0],
+                })
+                logger.debug(f"Could not add company_id to '{table_name}': {e}")
+
+    return result
+
+
+def migrate_to_v2(engine: Engine | None = None) -> dict:
+    """
+    Run all V2 (Phase 5) idempotent migrations:
+      1. Create portfolio_company table
+      2. Add company_id column to all entity tables
+      3. Create composite unique indexes (canonical_name + company_id)
+
+    Safe to call on every app startup. All operations are IF NOT EXISTS / IF EXISTS.
+
+    Returns: {"portfolio_table": {...}, "company_columns": {...}, "indexes": {...}}
+    """
+    from pipeline.company import ensure_portfolio_table
+
+    engine = engine or get_engine()
+    result = {}
+
+    # Step 1: Ensure portfolio_company table
+    result["portfolio_table"] = ensure_portfolio_table(engine)
+
+    # Step 2: Add company_id columns
+    result["company_columns"] = ensure_company_column(engine)
+
+    # Step 3: Create composite unique indexes on entity tables
+    idx_result = {"created": [], "errors": []}
+    with engine.begin() as conn:
+        for table_name in ENTITY_TABLES:
+            quoted = _quote_identifier(table_name)
+            idx_name = f"idx_{table_name}_canonical_company"
+            try:
+                # Create composite unique index with COALESCE for NULL handling
+                conn.execute(text(
+                    f"CREATE UNIQUE INDEX IF NOT EXISTS {idx_name} "
+                    f"ON {quoted} (canonical_name, COALESCE(company_id, -1))"
+                ))
+                idx_result["created"].append(table_name)
+            except (ProgrammingError, OperationalError) as e:
+                idx_result["errors"].append({
+                    "table": table_name,
+                    "error": str(e).split("\n")[0],
+                })
+
+        # Also create company_id indexes for FK lookups
+        for table_name in ENTITY_TABLES:
+            quoted = _quote_identifier(table_name)
+            try:
+                conn.execute(text(
+                    f"CREATE INDEX IF NOT EXISTS idx_{table_name}_company_id "
+                    f"ON {quoted} (company_id)"
+                ))
+            except (ProgrammingError, OperationalError):
+                pass  # Non-critical
+
+    result["indexes"] = idx_result
+    logger.info(f"V2 migration complete: {result}")
+
+    return result
 
 
 # ── Schema Drop / Reset ────────────────────────────────────────────────────

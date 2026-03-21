@@ -20,38 +20,44 @@ from typing import Any
 
 from pipeline.ontology.schema import EntityRegistry, OntologyType
 from pipeline.schema_generator import (
-    FK_RULES,
     SCHEMA_OUTPUT_DIR,
     REGISTRY_PATH,
     generate_schema,
     load_registry,
+    _get_fk_rules,
 )
 
 DATAFLOW_OUTPUT_DIR = Path("outputs/dataflow")
 
-# Colors for each ontology type (consistent across UI)
-TYPE_COLORS: dict[str, str] = {
-    "vendor":           "#4A90D9",
-    "customer":         "#50C878",
-    "employee":         "#F5A623",
-    "product":          "#9B59B6",
-    "transaction":      "#E74C3C",
-    "contract":         "#1ABC9C",
-    "financial_record": "#F39C12",
-    "business_unit":    "#3498DB",
-    "unknown":          "#95A5A6",
-}
 
-TYPE_LABELS: dict[str, str] = {
-    "vendor":           "Vendors",
-    "customer":         "Customers",
-    "employee":         "Employees",
-    "product":          "Products",
-    "transaction":      "Transactions",
-    "contract":         "Contracts",
-    "financial_record": "Financial Records",
-    "business_unit":    "Business Units",
-}
+def _get_type_colors() -> dict[str, str]:
+    """Load type colors from database, with hardcoded fallback."""
+    try:
+        from services.ontology_service import get_type_colors
+        return get_type_colors()
+    except Exception:
+        return {
+            "vendor": "#4A90D9", "customer": "#50C878", "employee": "#F5A623",
+            "product": "#9B59B6", "transaction": "#E74C3C", "contract": "#1ABC9C",
+            "financial_record": "#F39C12", "business_unit": "#3498DB", "unknown": "#95A5A6",
+        }
+
+
+def _get_type_labels() -> dict[str, str]:
+    """Load type labels from database, with hardcoded fallback."""
+    try:
+        from services.ontology_service import get_type_labels
+        return get_type_labels()
+    except Exception:
+        return {
+            "vendor": "Vendors", "customer": "Customers", "employee": "Employees",
+            "product": "Products", "transaction": "Transactions", "contract": "Contracts",
+            "financial_record": "Financial Records", "business_unit": "Business Units",
+        }
+
+# Backward-compatible module-level names (used by other modules)
+TYPE_COLORS = None  # Use _get_type_colors()
+TYPE_LABELS = None  # Use _get_type_labels()
 
 
 def build_graph(registry: EntityRegistry, schema: dict | None = None) -> dict:
@@ -73,19 +79,26 @@ def build_graph(registry: EntityRegistry, schema: dict | None = None) -> dict:
     """
     # Group entities by type
     type_entities: dict[str, list[dict]] = defaultdict(list)
+    # Phase 5: track company distribution across entities
+    company_entities: dict[str, set[str]] = defaultdict(set)  # company_slug → set of entity IDs
 
     for record in registry.entries.values():
         if record.ontology_type == OntologyType.UNKNOWN:
             continue
         type_key = record.ontology_type.value
-        type_entities[type_key].append({
+        entity_info = {
             "id": record.id,
             "name": record.canonical_name,
             "confidence": record.confidence.value,
             "aliases": record.aliases,
             "source_file": record.source_file,
             "attributes": record.attributes,
-        })
+        }
+        # Phase 5: include company_slug if present
+        if hasattr(record, "company_slug") and record.company_slug:
+            entity_info["company_slug"] = record.company_slug
+            company_entities[record.company_slug].add(record.id)
+        type_entities[type_key].append(entity_info)
 
     # Build nodes — one per ontology type that has entities
     nodes = []
@@ -93,9 +106,9 @@ def build_graph(registry: EntityRegistry, schema: dict | None = None) -> dict:
         entities = type_entities[type_key]
         nodes.append({
             "id": type_key,
-            "label": TYPE_LABELS.get(type_key, type_key.replace("_", " ").title()),
+            "label": _get_type_labels().get(type_key, type_key.replace("_", " ").title()),
             "type": "group",
-            "color": TYPE_COLORS.get(type_key, "#95A5A6"),
+            "color": _get_type_colors().get(type_key, "#95A5A6"),
             "entity_count": len(entities),
             "entities": sorted(entities, key=lambda e: e["name"]),
         })
@@ -105,7 +118,7 @@ def build_graph(registry: EntityRegistry, schema: dict | None = None) -> dict:
     edges = []
     seen_edges = set()
 
-    for (child, col), parent in FK_RULES.items():
+    for (child, col), parent in _get_fk_rules().items():
         if child in active_types and parent in active_types:
             edge_key = f"{child}->{parent}"
             if edge_key not in seen_edges:
@@ -136,14 +149,28 @@ def build_graph(registry: EntityRegistry, schema: dict | None = None) -> dict:
 
     total_entities = sum(len(e) for e in type_entities.values())
 
+    # Phase 5: portfolio summary when multiple companies present
+    portfolio_stats = {}
+    if company_entities:
+        portfolio_stats = {
+            "total_companies": len(company_entities),
+            "entities_by_company": {
+                slug: len(ids) for slug, ids in sorted(company_entities.items())
+            },
+        }
+
+    stats = {
+        "total_entities": total_entities,
+        "total_types": len(nodes),
+        "total_relationships": len(edges),
+    }
+    if portfolio_stats:
+        stats["portfolio"] = portfolio_stats
+
     return {
         "nodes": nodes,
         "edges": edges,
-        "stats": {
-            "total_entities": total_entities,
-            "total_types": len(nodes),
-            "total_relationships": len(edges),
-        },
+        "stats": stats,
         "generated_at": datetime.utcnow().isoformat(),
     }
 

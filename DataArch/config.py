@@ -45,8 +45,27 @@ EMBEDDING_DIMENSION: int = int(os.getenv("DATAARCH_EMBEDDING_DIM", "1024"))
 # ── Application ──────────────────────────────────────────────────────────────
 
 DATAARCH_ENV: str = os.getenv("DATAARCH_ENV", "dev")
-APP_VERSION: str = "0.6.0"
+APP_VERSION: str = "0.8.0"
 APP_NAME: str = "DataArch.AI"
+
+# ── Authentication ──────────────────────────────────────────────────────────
+
+JWT_SECRET: str = os.getenv("JWT_SECRET", "dataarch-dev-secret-change-in-production")
+JWT_ALGORITHM: str = "HS256"
+JWT_EXPIRY_HOURS: int = int(os.getenv("JWT_EXPIRY_HOURS", "24"))
+
+# ── CORS ────────────────────────────────────────────────────────────────────
+
+CORS_ORIGINS: list[str] = [
+    o.strip()
+    for o in os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",")
+    if o.strip()
+]
+
+# ── Entity Resolution (Phase 5) ────────────────────────────────────────────
+
+DEFAULT_SIMILARITY_THRESHOLD: float = float(os.getenv("DATAARCH_SIMILARITY_THRESHOLD", "0.85"))
+MAX_MERGE_HISTORY: int = int(os.getenv("DATAARCH_MAX_MERGE_HISTORY", "1000"))
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 

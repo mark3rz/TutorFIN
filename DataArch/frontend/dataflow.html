@@ -6,83 +6,207 @@
 <title>DataArch.AI — Data Flow Map</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Epilogue:wght@700;900&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap');
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #0f1117; color: #e0e0e0; overflow: hidden; }
+  body {
+    font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #0f0e17;
+    color: #e0e0e0;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
 
   #graph-container { width: 100vw; height: 100vh; position: relative; }
 
   svg { width: 100%; height: 100%; }
 
-  .link { stroke-opacity: 0.5; fill: none; }
-  .link-label { font-size: 10px; fill: #888; pointer-events: none; }
+  .link { stroke-opacity: 0.4; fill: none; }
+  .link-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    fill: #6b6b7a;
+    pointer-events: none;
+  }
 
-  .node-circle { cursor: pointer; stroke-width: 2px; transition: r 0.2s; }
-  .node-circle:hover { stroke-width: 3px; }
+  .node-circle {
+    cursor: pointer;
+    stroke-width: 2px;
+    transition: r 0.2s;
+    filter: drop-shadow(0 0 8px rgba(255,255,255,0.08));
+  }
+  .node-circle:hover {
+    stroke-width: 3px;
+    filter: drop-shadow(0 0 16px rgba(255,255,255,0.15));
+  }
 
-  .node-label { font-size: 12px; font-weight: 600; fill: #e0e0e0; pointer-events: none; text-anchor: middle; }
-  .node-count { font-size: 10px; fill: #aaa; pointer-events: none; text-anchor: middle; }
+  .node-label {
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    fill: #ffffff;
+    pointer-events: none;
+    text-anchor: middle;
+  }
+  .node-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    fill: #ababb8;
+    pointer-events: none;
+    text-anchor: middle;
+  }
 
   /* Sidebar panel */
   #sidebar {
-    position: fixed; top: 0; right: -400px; width: 400px; height: 100vh;
-    background: #1a1d27; border-left: 1px solid #2a2d3a; padding: 24px;
+    position: fixed; top: 0; right: -420px; width: 420px; height: 100vh;
+    background: #ffffff; border-left: 1px solid #ebebec; padding: 28px;
     overflow-y: auto; transition: right 0.3s ease; z-index: 100;
+    color: #0f0e17;
   }
   #sidebar.open { right: 0; }
   #sidebar-close {
     position: absolute; top: 16px; right: 16px; background: none; border: none;
-    color: #888; font-size: 20px; cursor: pointer;
+    color: #ababb8; font-size: 20px; cursor: pointer;
   }
-  #sidebar-close:hover { color: #fff; }
-  #sidebar h2 { font-size: 18px; margin-bottom: 4px; }
+  #sidebar-close:hover { color: #0f0e17; }
+  #sidebar h2 {
+    font-family: 'Epilogue', sans-serif;
+    font-size: 20px;
+    font-weight: 900;
+    margin-bottom: 4px;
+    color: #0f0e17;
+    letter-spacing: -0.02em;
+  }
   #sidebar .type-badge {
-    display: inline-block; padding: 2px 10px; border-radius: 12px;
-    font-size: 11px; font-weight: 600; color: #fff; margin-bottom: 16px;
+    display: inline-block; padding: 3px 10px; border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; font-weight: 500; color: #fff;
+    margin-bottom: 16px; text-transform: uppercase;
+    letter-spacing: 0.1em;
   }
-  #sidebar .stat { font-size: 13px; color: #888; margin-bottom: 16px; }
+  #sidebar .stat {
+    font-family: 'Epilogue', sans-serif;
+    font-size: 36px;
+    font-weight: 900;
+    color: #0f0e17;
+    margin-bottom: 4px;
+    letter-spacing: -0.03em;
+  }
+  #sidebar .stat-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #ababb8;
+    margin-bottom: 20px;
+  }
 
   .entity-card {
-    background: #22252f; border: 1px solid #2a2d3a; border-radius: 8px;
-    padding: 12px; margin-bottom: 8px;
+    background: #f7f7f8; border: 1px solid #ebebec; border-radius: 10px;
+    padding: 14px; margin-bottom: 8px;
   }
-  .entity-card h4 { font-size: 14px; margin-bottom: 4px; }
-  .entity-card .meta { font-size: 11px; color: #888; }
-  .entity-card .confidence { font-size: 11px; padding: 1px 6px; border-radius: 4px; }
-  .confidence-high { background: #1e4d2b; color: #50C878; }
-  .confidence-medium { background: #4d3e1e; color: #F5A623; }
-  .confidence-low { background: #4d1e1e; color: #E74C3C; }
+  .entity-card h4 {
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #0f0e17;
+  }
+  .entity-card .meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: #6b6b7a;
+  }
+  .entity-card .confidence {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .confidence-high   { background: #f0fdf4; color: #16a34a; }
+  .confidence-medium { background: #fffbeb; color: #d97706; }
+  .confidence-low    { background: #fef2f2; color: #dc2626; }
 
   .entity-attrs { margin-top: 8px; }
-  .entity-attrs dt { font-size: 11px; color: #666; margin-top: 4px; }
-  .entity-attrs dd { font-size: 12px; color: #ccc; margin-left: 0; }
+  .entity-attrs dt {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: #ababb8;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .entity-attrs dd {
+    font-size: 13px;
+    color: #0f0e17;
+    margin-left: 0;
+  }
 
   /* Header overlay */
   #header {
-    position: fixed; top: 16px; left: 16px; z-index: 50;
+    position: fixed; top: 20px; left: 20px; z-index: 50;
   }
-  #header h1 { font-size: 20px; font-weight: 700; }
-  #header h1 span { color: #4A90D9; }
-  #header .subtitle { font-size: 12px; color: #666; margin-top: 2px; }
+  #header h1 {
+    font-family: 'Epilogue', sans-serif;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+  }
+  #header h1 span { color: #2563eb; }
+  #header .subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: #6b6b7a;
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
 
   /* Stats overlay */
   #stats-bar {
-    position: fixed; bottom: 16px; left: 16px; z-index: 50;
-    display: flex; gap: 16px;
+    position: fixed; bottom: 20px; left: 20px; z-index: 50;
+    display: flex; gap: 12px;
   }
   .stat-chip {
-    background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 8px;
-    padding: 8px 14px; font-size: 12px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: #ababb8;
   }
-  .stat-chip strong { color: #4A90D9; }
+  .stat-chip strong { color: #2563eb; }
 
   /* Legend */
   #legend {
-    position: fixed; bottom: 16px; right: 16px; z-index: 50;
-    background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 8px;
-    padding: 12px 16px;
+    position: fixed; bottom: 20px; right: 20px; z-index: 50;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 14px 18px;
   }
-  #legend h3 { font-size: 12px; color: #888; margin-bottom: 8px; }
-  .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; }
+  #legend h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: #6b6b7a;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 12px;
+    color: #e0e0e0;
+  }
   .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 
   /* Empty state */
@@ -90,8 +214,18 @@
     position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
     text-align: center; z-index: 50; display: none;
   }
-  #empty-state h2 { font-size: 24px; margin-bottom: 8px; }
-  #empty-state p { font-size: 14px; color: #888; max-width: 400px; }
+  #empty-state h2 {
+    font-family: 'Epilogue', sans-serif;
+    font-size: 28px;
+    font-weight: 900;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+  #empty-state p {
+    font-size: 14px;
+    color: #6b6b7a;
+    max-width: 400px;
+  }
 </style>
 </head>
 <body>
@@ -126,6 +260,18 @@
 <script>
 const API_BASE = window.location.origin;
 
+// Updated color palette for entity types
+const DA_COLORS = {
+  vendor:           '#2563eb',
+  customer:         '#7c3aed',
+  employee:         '#16a34a',
+  product:          '#a21caf',
+  transaction:      '#d97706',
+  contract:         '#475569',
+  financial_record: '#c2410c',
+  business_unit:    '#0d9488',
+};
+
 async function fetchGraph() {
   try {
     const res = await fetch(`${API_BASE}/dataflow`);
@@ -150,7 +296,8 @@ function renderSidebar(node) {
 
   let html = `<h2>${node.label}</h2>`;
   html += `<span class="type-badge" style="background:${node.color}">${node.id}</span>`;
-  html += `<div class="stat">${node.entity_count} entities</div>`;
+  html += `<div class="stat">${node.entity_count}</div>`;
+  html += `<div class="stat-label">Entities</div>`;
 
   for (const entity of node.entities) {
     const confClass = `confidence-${entity.confidence}`;
@@ -197,6 +344,13 @@ function renderGraph(data) {
     return;
   }
 
+  // Apply new color palette to nodes
+  for (const node of data.nodes) {
+    if (DA_COLORS[node.id]) {
+      node.color = DA_COLORS[node.id];
+    }
+  }
+
   // Update stats
   document.getElementById("stat-types").textContent = data.stats.total_types;
   document.getElementById("stat-entities").textContent = data.stats.total_entities;
@@ -213,7 +367,7 @@ function renderGraph(data) {
   // Clear previous
   svg.selectAll("*").remove();
 
-  // Defs for arrow markers
+  // Defs for arrow markers and glow filter
   const defs = svg.append("defs");
   defs.append("marker")
     .attr("id", "arrowhead")
@@ -225,7 +379,19 @@ function renderGraph(data) {
     .attr("orient", "auto")
     .append("path")
     .attr("d", "M0,-5L10,0L0,5")
-    .attr("fill", "#555");
+    .attr("fill", "#3a3a4a");
+
+  // Glow filter for nodes
+  const glow = defs.append("filter")
+    .attr("id", "glow")
+    .attr("x", "-50%").attr("y", "-50%")
+    .attr("width", "200%").attr("height", "200%");
+  glow.append("feGaussianBlur")
+    .attr("stdDeviation", "4")
+    .attr("result", "coloredBlur");
+  const feMerge = glow.append("feMerge");
+  feMerge.append("feMergeNode").attr("in", "coloredBlur");
+  feMerge.append("feMergeNode").attr("in", "SourceGraphic");
 
   const g = svg.append("g");
 
@@ -251,8 +417,8 @@ function renderGraph(data) {
     .data(data.edges)
     .join("line")
     .attr("class", "link")
-    .attr("stroke", "#444")
-    .attr("stroke-width", 2)
+    .attr("stroke", "#2a2a3a")
+    .attr("stroke-width", 1.5)
     .attr("marker-end", "url(#arrowhead)");
 
   // Link labels
@@ -272,13 +438,14 @@ function renderGraph(data) {
       .on("drag", dragged)
       .on("end", dragEnded));
 
-  // Node circles
+  // Node circles with glow
   node.append("circle")
     .attr("class", "node-circle")
     .attr("r", d => radiusScale(d.entity_count))
     .attr("fill", d => d.color)
-    .attr("stroke", d => d3.color(d.color).brighter(0.5))
-    .attr("fill-opacity", 0.85)
+    .attr("stroke", d => d3.color(d.color).brighter(0.8))
+    .attr("fill-opacity", 0.9)
+    .attr("filter", "url(#glow)")
     .on("click", (event, d) => { event.stopPropagation(); renderSidebar(d); });
 
   // Node labels

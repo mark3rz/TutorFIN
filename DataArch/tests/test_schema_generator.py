@@ -126,16 +126,20 @@ def test_generate_schema_single_table():
     )
     schema = generate_schema(registry)
 
-    assert schema["version"] == "1.1"
-    assert len(schema["tables"]) == 1
+    assert schema["version"] == "2.0"
+    # portfolio_company system table + vendor = 2 tables
+    assert len(schema["tables"]) == 2
 
-    table = schema["tables"][0]
-    assert table["table_name"] == "vendor"
+    # portfolio_company should come first (parent)
+    assert schema["tables"][0]["table_name"] == "portfolio_company"
+
+    table = [t for t in schema["tables"] if t["table_name"] == "vendor"][0]
     assert table["record_count"] == 1
 
     col_names = [c["name"] for c in table["columns"]]
     assert "id" in col_names
     assert "canonical_name" in col_names
+    assert "company_id" in col_names
     assert "vendor_id" in col_names
     assert "legal_name" in col_names
     assert "payment_terms" in col_names
@@ -155,8 +159,10 @@ def test_generate_schema_multiple_tables():
     )
     schema = generate_schema(registry)
 
-    assert len(schema["tables"]) == 3
+    # 3 entity tables + portfolio_company = 4
+    assert len(schema["tables"]) == 4
     table_names = [t["table_name"] for t in schema["tables"]]
+    assert "portfolio_company" in table_names
     assert "vendor" in table_names
     assert "customer" in table_names
     assert "transaction" in table_names
@@ -169,8 +175,11 @@ def test_generate_schema_skips_unknown():
     )
     schema = generate_schema(registry)
 
-    assert len(schema["tables"]) == 1
-    assert schema["tables"][0]["table_name"] == "vendor"
+    # portfolio_company + vendor = 2 (unknown is skipped)
+    assert len(schema["tables"]) == 2
+    table_names = [t["table_name"] for t in schema["tables"]]
+    assert "vendor" in table_names
+    assert "portfolio_company" in table_names
 
 
 def test_generate_schema_nullable_columns():
@@ -191,7 +200,7 @@ def test_generate_schema_nullable_columns():
         }),
     )
     schema = generate_schema(registry)
-    table = schema["tables"][0]
+    table = [t for t in schema["tables"] if t["table_name"] == "vendor"][0]
     col_map = {c["name"]: c for c in table["columns"]}
 
     # vendor_id and legal_name appear in 3/3 records → not nullable
@@ -214,15 +223,21 @@ def test_generate_schema_foreign_keys_reference_canonical_name():
     schema = generate_schema(registry)
     tx_table = [t for t in schema["tables"] if t["table_name"] == "transaction"][0]
 
-    assert len(tx_table["foreign_keys"]) == 1
-    fk = tx_table["foreign_keys"][0]
-    assert fk["column"] == "vendor_id"
-    assert fk["references_table"] == "vendor"
-    assert fk["references_column"] == "canonical_name"
+    # Phase 5: vendor_id FK + company_id FK = 2 FKs
+    vendor_fk = [fk for fk in tx_table["foreign_keys"] if fk["column"] == "vendor_id"]
+    assert len(vendor_fk) == 1
+    assert vendor_fk[0]["references_table"] == "vendor"
+    assert vendor_fk[0]["references_column"] == "canonical_name"
+
+    # company_id FK should reference portfolio_company.id
+    company_fk = [fk for fk in tx_table["foreign_keys"] if fk["column"] == "company_id"]
+    assert len(company_fk) == 1
+    assert company_fk[0]["references_table"] == "portfolio_company"
+    assert company_fk[0]["references_column"] == "id"
 
 
 def test_generate_schema_has_indexes():
-    """Each table should have indexes for canonical_name and FK columns."""
+    """Each table should have indexes for canonical_name+company_id and FK columns."""
     registry = _build_registry(
         _make_record("v1", OntologyType.VENDOR, "Acme", {"vendor_id": "V001"}),
         _make_record("t1", OntologyType.TRANSACTION, "Invoice", {
@@ -235,25 +250,40 @@ def test_generate_schema_has_indexes():
     vendor_table = [t for t in schema["tables"] if t["table_name"] == "vendor"][0]
     tx_table = [t for t in schema["tables"] if t["table_name"] == "transaction"][0]
 
-    # Vendor should have a unique index on canonical_name
+    # Vendor should have a composite unique index on (canonical_name, company_id)
     vendor_idx = vendor_table["indexes"]
-    assert any(idx["columns"] == ["canonical_name"] and idx["unique"] for idx in vendor_idx)
+    assert any(
+        idx["columns"] == ["canonical_name", "company_id"] and idx["unique"]
+        for idx in vendor_idx
+    )
+    # Vendor should have a company_id index
+    assert any(idx["columns"] == ["company_id"] for idx in vendor_idx)
 
-    # Transaction should have canonical_name index + vendor_id FK index
+    # Transaction should have canonical_name+company_id composite index + vendor_id FK index
     tx_idx = tx_table["indexes"]
-    assert any(idx["columns"] == ["canonical_name"] for idx in tx_idx)
+    assert any(
+        idx["columns"] == ["canonical_name", "company_id"] and idx["unique"]
+        for idx in tx_idx
+    )
     assert any(idx["columns"] == ["vendor_id"] for idx in tx_idx)
 
 
-def test_generate_schema_canonical_name_is_unique():
-    """The canonical_name column should have unique=True."""
+def test_generate_schema_canonical_name_composite_unique():
+    """Phase 5: canonical_name uniqueness is via composite index, not column-level UNIQUE."""
     registry = _build_registry(
         _make_record("v1", OntologyType.VENDOR, "Acme", {"vendor_id": "V001"}),
     )
     schema = generate_schema(registry)
-    table = schema["tables"][0]
+    table = [t for t in schema["tables"] if t["table_name"] == "vendor"][0]
     cn_col = [c for c in table["columns"] if c["name"] == "canonical_name"][0]
-    assert cn_col.get("unique") is True
+    # No column-level unique — uniqueness is enforced by the composite functional index
+    assert cn_col.get("unique") is not True
+
+    # Composite unique index should exist
+    assert any(
+        idx["columns"] == ["canonical_name", "company_id"] and idx["unique"]
+        for idx in table["indexes"]
+    )
 
 
 def test_generate_schema_audit_columns_have_defaults():
@@ -262,7 +292,7 @@ def test_generate_schema_audit_columns_have_defaults():
         _make_record("v1", OntologyType.VENDOR, "Acme", {"vendor_id": "V001"}),
     )
     schema = generate_schema(registry)
-    table = schema["tables"][0]
+    table = [t for t in schema["tables"] if t["table_name"] == "vendor"][0]
     col_map = {c["name"]: c for c in table["columns"]}
     assert col_map["created_at"].get("default") == "NOW()"
     assert col_map["updated_at"].get("default") == "NOW()"
@@ -284,6 +314,8 @@ def test_topological_sort_parents_before_children():
     schema = generate_schema(registry)
     table_names = [t["table_name"] for t in schema["tables"]]
 
+    # portfolio_company should be first (referenced by all entity tables)
+    assert table_names[0] == "portfolio_company"
     # vendor and customer should come before transaction
     assert table_names.index("vendor") < table_names.index("transaction")
     assert table_names.index("customer") < table_names.index("transaction")
@@ -291,7 +323,7 @@ def test_topological_sort_parents_before_children():
 
 def test_topological_sort_deep_chain():
     """Multi-level dependencies should be properly ordered."""
-    # vendor → product (vendor_id FK) → transaction (product_id FK)
+    # portfolio_company → vendor → product (vendor_id FK) → transaction (product_id FK)
     registry = _build_registry(
         _make_record("v1", OntologyType.VENDOR, "Acme", {"vendor_id": "V001"}),
         _make_record("p1", OntologyType.PRODUCT, "Widget", {
@@ -307,6 +339,7 @@ def test_topological_sort_deep_chain():
     schema = generate_schema(registry)
     table_names = [t["table_name"] for t in schema["tables"]]
 
+    assert table_names.index("portfolio_company") < table_names.index("vendor")
     assert table_names.index("vendor") < table_names.index("product")
     assert table_names.index("vendor") < table_names.index("transaction")
     assert table_names.index("product") < table_names.index("transaction")
@@ -353,15 +386,19 @@ def test_ddl_quotes_reserved_word_table_names():
     assert 'CREATE TABLE IF NOT EXISTS "transaction"' in ddl
 
 
-def test_ddl_has_unique_on_canonical_name():
-    """DDL should include UNIQUE constraint on canonical_name."""
+def test_ddl_has_composite_unique_index():
+    """Phase 5: DDL should include composite unique index on (canonical_name, company_id)."""
     registry = _build_registry(
         _make_record("v1", OntologyType.VENDOR, "Acme", {"vendor_id": "V001"}),
     )
     schema = generate_schema(registry)
     ddl = schema_to_ddl(schema)
 
-    assert "canonical_name VARCHAR(255) NOT NULL UNIQUE" in ddl
+    # canonical_name should NOT have column-level UNIQUE (composite index handles this)
+    assert "canonical_name VARCHAR(255) NOT NULL" in ddl
+    # Composite functional index for uniqueness
+    assert "idx_vendor_canonical_company" in ddl
+    assert "COALESCE(company_id, -1)" in ddl
 
 
 def test_ddl_has_default_now():
@@ -404,7 +441,9 @@ def test_ddl_includes_indexes():
 
     assert "CREATE UNIQUE INDEX IF NOT EXISTS" in ddl
     assert "CREATE INDEX IF NOT EXISTS" in ddl
-    assert "idx_vendor_canonical_name" in ddl
+    # Phase 5: composite unique + company_id + FK indexes
+    assert "idx_vendor_canonical_company" in ddl
+    assert "idx_vendor_company_id" in ddl
     assert "idx_transaction_vendor_id" in ddl
 
 
@@ -413,6 +452,8 @@ def test_ddl_header_comment():
     ddl = schema_to_ddl(schema)
     assert "DataArch.AI" in ddl
     assert "Auto-generated" in ddl
+    # Even empty registry should have portfolio_company table
+    assert "portfolio_company" in ddl
 
 
 def test_ddl_output_is_valid_sql():
@@ -426,9 +467,13 @@ def test_ddl_output_is_valid_sql():
     schema = generate_schema(registry)
     ddl = schema_to_ddl(schema)
 
+    # portfolio_company system table
+    assert "CREATE TABLE IF NOT EXISTS portfolio_company" in ddl
+    # vendor entity table
     assert "CREATE TABLE IF NOT EXISTS vendor" in ddl
     assert "PRIMARY KEY" in ddl
     assert "canonical_name" in ddl
+    assert "company_id" in ddl
     assert "vendor_id" in ddl
     assert "payment_terms" in ddl
     assert "created_at" in ddl
@@ -446,3 +491,5 @@ def test_ddl_includes_foreign_keys():
     ddl = schema_to_ddl(schema)
 
     assert "FOREIGN KEY (vendor_id) REFERENCES vendor(canonical_name)" in ddl
+    # Phase 5: company_id FK to portfolio_company
+    assert "FOREIGN KEY (company_id) REFERENCES portfolio_company(id)" in ddl

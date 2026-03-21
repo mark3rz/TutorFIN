@@ -74,6 +74,8 @@ class PipelineJob:
     steps: dict[str, StepResult] = field(default_factory=dict)
     error: str | None = None
     document_id: str | None = None
+    company_id: int | None = None       # Phase 5: portfolio company association
+    company_slug: str | None = None     # Phase 5: resolved from company_id
 
     def __post_init__(self):
         if not self.steps:
@@ -89,6 +91,8 @@ class PipelineJob:
             "completed_at": self.completed_at,
             "duration_ms": self.duration_ms,
             "document_id": self.document_id,
+            "company_id": self.company_id,
+            "company_slug": self.company_slug,
             "error": self.error,
             "steps": {
                 name: {
@@ -189,7 +193,12 @@ def _summarize_result(result: dict) -> dict:
 
 # ── Main Pipeline Execution ──────────────────────────────────────────────────
 
-def run_pipeline(file_path: Path, filename: str, skip_embed: bool = False) -> str:
+def run_pipeline(
+    file_path: Path,
+    filename: str,
+    skip_embed: bool = False,
+    company_id: int | None = None,
+) -> str:
     """
     Launch the full pipeline as a background thread.
 
@@ -197,12 +206,13 @@ def run_pipeline(file_path: Path, filename: str, skip_embed: bool = False) -> st
         file_path: Path to the uploaded file on disk.
         filename: Original filename (for naming outputs).
         skip_embed: If True, skip the embedding step (no Voyage API key).
+        company_id: Portfolio company ID to associate entities with (Phase 5).
 
     Returns:
         job_id: Unique identifier for polling status.
     """
     job_id = str(uuid.uuid4())[:8]
-    job = PipelineJob(job_id=job_id, filename=filename)
+    job = PipelineJob(job_id=job_id, filename=filename, company_id=company_id)
 
     with _lock:
         _jobs[job_id] = job
@@ -214,8 +224,23 @@ def run_pipeline(file_path: Path, filename: str, skip_embed: bool = False) -> st
     )
     thread.start()
 
-    logger.info(f"Pipeline job '{job_id}' queued for '{filename}'.")
+    logger.info(f"Pipeline job '{job_id}' queued for '{filename}'"
+                f"{f' (company_id={company_id})' if company_id else ''}.")
     return job_id
+
+
+def _resolve_company_slug(company_id: int | None) -> str | None:
+    """Resolve company_id → company_slug for the ontology layer. Returns None if not found."""
+    if company_id is None:
+        return None
+    try:
+        from pipeline.company import get_company
+        company = get_company(company_id)
+        if company:
+            return company.slug
+    except Exception as e:
+        logger.warning(f"Could not resolve company slug for id={company_id}: {e}")
+    return None
 
 
 def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
@@ -225,6 +250,10 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
     t0 = time.monotonic()
 
     all_success = True
+
+    # Phase 5: resolve company slug from company_id
+    company_slug = _resolve_company_slug(job.company_id)
+    job.company_slug = company_slug
 
     try:
         # ── Step 1: Ingest ──────────────────────────────────
@@ -254,8 +283,10 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
                 doc_id = parsed_path.stem
                 job.document_id = doc_id
 
+        # Phase 5: pass company_slug to ontology mapper
         ont_result = _run_step(
-            job, "ontology", map_from_parsed_json, parsed_path
+            job, "ontology", map_from_parsed_json, parsed_path,
+            company_slug=company_slug,
         )
         job.steps["ontology"].detail = {
             "mapped": len(ont_result.records),
@@ -290,7 +321,11 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
             try:
                 from pipeline.data_loader import load_from_files
 
-                load_result = _run_step(job, "data_load", load_from_files)
+                # Phase 5: pass company_id to data loader for per-company isolation
+                load_result = _run_step(
+                    job, "data_load", load_from_files,
+                    company_id=job.company_id,
+                )
             except Exception as e:
                 job.steps["data_load"].status = "failed"
                 job.steps["data_load"].error = str(e)
@@ -316,7 +351,7 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
 
                 _run_step(job, "embed", lambda: (
                     setup_pgvector(),
-                    embed_all_entities(),
+                    embed_all_entities(company_id=job.company_id),
                 ))
             except (EnvironmentError, ImportError) as e:
                 job.steps["embed"].status = "skipped"

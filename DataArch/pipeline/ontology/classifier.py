@@ -20,98 +20,58 @@ from pipeline.ontology.schema import OntologyType, MappingConfidence
 
 logger = logging.getLogger(__name__)
 
-# The PE ontology types with examples of raw names that map to each.
-# This is included verbatim in the prompt to ground the LLM.
-ONTOLOGY_SPEC = """
-PE Business Ontology — canonical types and example raw names:
+# ── Dynamic ontology spec and tool (loaded from DB via ontology_service) ──────
 
-VENDOR
-  Examples: supplier, counterparty, service provider, contractor, subcontractor,
-            payee, merchant, vendor, fulfillment partner
-  Key attributes: vendor_id, legal_name, payment_terms, category
-
-CUSTOMER
-  Examples: client, account, buyer, end customer, subscriber, billable entity
-  Key attributes: customer_id, legal_name, segment, revenue_tier
-
-EMPLOYEE
-  Examples: staff member, headcount, team member, payee (HR), contractor (HR)
-  Key attributes: employee_id, role, department, compensation_band
-
-PRODUCT
-  Examples: SKU, line item, service offering, subscription tier, good, material
-  Key attributes: product_id, name, unit_price, category, revenue_type
-
-TRANSACTION
-  Examples: invoice, payment, purchase order, bill, receipt, wire transfer,
-            expense, charge, credit note, debit, journal entry
-  Key attributes: transaction_id, amount, currency, date, counterparty, direction
-
-CONTRACT
-  Examples: agreement, MSA, SOW, lease, NDA, license, SLA, amendment, addendum
-  Key attributes: contract_id, parties, effective_date, expiry_date, value, type
-
-FINANCIAL_RECORD
-  Examples: P&L, balance sheet, income statement, trial balance, budget,
-            forecast, general ledger, chart of accounts
-  Key attributes: period, record_type, total_value, currency
-
-BUSINESS_UNIT
-  Examples: division, department, subsidiary, entity, location, plant, region
-  Key attributes: unit_id, name, parent_entity, headcount
-
-UNKNOWN
-  Use when the entity cannot be confidently classified into any of the above.
-"""
+def _get_ontology_spec() -> str:
+    """Build ONTOLOGY_SPEC dynamically from the database."""
+    from services.ontology_service import get_classification_spec
+    return get_classification_spec()
 
 
-# ── Tool definition for classification ───────────────────────────────────────
-
-CLASSIFICATION_TOOL = {
-    "name": "classify_business_entity",
-    "description": (
-        "Classify a business entity into the PE business ontology. "
-        "Determine the entity type, confidence level, and extract normalised attributes."
-    ),
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "ontology_type": {
-                "type": "string",
-                "enum": [
-                    "vendor", "customer", "employee", "product",
-                    "transaction", "contract", "financial_record",
-                    "business_unit", "unknown",
-                ],
-                "description": "The PE ontology type this entity belongs to.",
+def _get_classification_tool() -> dict:
+    """Build CLASSIFICATION_TOOL dynamically from the database."""
+    from services.ontology_service import get_classification_tool_enum
+    return {
+        "name": "classify_business_entity",
+        "description": (
+            "Classify a business entity into the PE business ontology. "
+            "Determine the entity type, confidence level, and extract normalised attributes."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ontology_type": {
+                    "type": "string",
+                    "enum": get_classification_tool_enum(),
+                    "description": "The PE ontology type this entity belongs to.",
+                },
+                "confidence": {
+                    "type": "string",
+                    "enum": ["high", "medium", "low"],
+                    "description": "How confident you are in this classification.",
+                },
+                "canonical_name": {
+                    "type": "string",
+                    "description": "Clean, normalised name for this entity (e.g. 'Acme Corporation', not 'ACME CORP.').",
+                },
+                "aliases": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Other names this entity goes by. Include the original raw name if it differs from canonical_name.",
+                },
+                "attributes": {
+                    "type": "object",
+                    "description": "Type-specific key-value attributes using the key names from the ontology spec.",
+                    "additionalProperties": {"type": "string"},
+                },
+                "mapping_notes": {
+                    "type": "string",
+                    "description": "One sentence explaining why you chose this type, or noting any ambiguity.",
+                },
             },
-            "confidence": {
-                "type": "string",
-                "enum": ["high", "medium", "low"],
-                "description": "How confident you are in this classification.",
-            },
-            "canonical_name": {
-                "type": "string",
-                "description": "Clean, normalised name for this entity (e.g. 'Acme Corporation', not 'ACME CORP.').",
-            },
-            "aliases": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Other names this entity goes by. Include the original raw name if it differs from canonical_name.",
-            },
-            "attributes": {
-                "type": "object",
-                "description": "Type-specific key-value attributes using the key names from the ontology spec.",
-                "additionalProperties": {"type": "string"},
-            },
-            "mapping_notes": {
-                "type": "string",
-                "description": "One sentence explaining why you chose this type, or noting any ambiguity.",
-            },
+            "required": ["ontology_type", "confidence", "canonical_name", "attributes"],
         },
-        "required": ["ontology_type", "confidence", "canonical_name", "attributes"],
-    },
-}
+    }
 
 
 # ── Pydantic model for validated classification ──────────────────────────────
@@ -128,10 +88,13 @@ class ClassificationResult(BaseModel):
 
 # ── Classification system prompt ─────────────────────────────────────────────
 
-CLASSIFICATION_SYSTEM = f"""You are a data architecture expert classifying business entities
+def _get_classification_system() -> str:
+    """Build the classification system prompt dynamically."""
+    spec = _get_ontology_spec()
+    return f"""You are a data architecture expert classifying business entities
 into a Private Equity business ontology.
 
-{ONTOLOGY_SPEC}
+{spec}
 
 Rules:
 - canonical_name should be a clean, deduplicated name (e.g. 'Acme Corporation', not 'ACME CORP.')
@@ -139,37 +102,6 @@ Rules:
 - attributes should use the key names listed in the ontology spec for the chosen type
 - Only include attributes that are actually present in the source data
 - Use the classify_business_entity tool to return your classification."""
-
-# Legacy prompt kept for reference / fallback
-CLASSIFY_PROMPT = """You are a data architecture expert classifying business entities
-into a Private Equity business ontology.
-
-{ontology_spec}
-
-Given the entity below, return ONLY valid JSON:
-{{
-  "ontology_type": "<one of: vendor|customer|employee|product|transaction|contract|financial_record|business_unit|unknown>",
-  "confidence": "<high|medium|low>",
-  "canonical_name": "<clean, normalised name for this entity>",
-  "aliases": ["<other names this entity goes by, if any>"],
-  "attributes": {{
-    "<type-specific key>": "<extracted value>"
-  }},
-  "mapping_notes": "<one sentence explaining why you chose this type, or any ambiguity>"
-}}
-
-Rules:
-- canonical_name should be a clean, deduplicated name (e.g. 'Acme Corporation', not 'ACME CORP.')
-- aliases should include the original raw name if it differs from canonical_name
-- attributes should use the key names listed in the ontology spec for the chosen type
-- Only include attributes that are actually present in the source data
-- Return only JSON — no explanation, no markdown
-
-Entity to classify:
-type: {entity_type}
-name: {entity_name}
-attributes: {entity_attributes}
-"""
 
 
 def classify_entity(
@@ -191,12 +123,15 @@ def classify_entity(
         f"Attributes: {json.dumps(entity_attributes, indent=2)}"
     )
 
+    classification_system = _get_classification_system()
+    classification_tool = _get_classification_tool()
+
     def _make_call():
         return llm_client.messages.create(
             model=MODEL,
             max_tokens=800,
-            system=CLASSIFICATION_SYSTEM,
-            tools=[CLASSIFICATION_TOOL],
+            system=classification_system,
+            tools=[classification_tool],
             tool_choice={"type": "tool", "name": "classify_business_entity"},
             messages=[{"role": "user", "content": user_message}],
         )

@@ -28,12 +28,19 @@ from pipeline.embeddings import generate_embeddings
 
 logger = logging.getLogger(__name__)
 
-# ── Entity tables in the PE ontology ────────────────────────────────────────
+# ── Entity tables (loaded from DB via ontology_service) ──────────────────────
 
-ENTITY_TABLES = [
-    "vendor", "customer", "employee", "product",
-    "transaction", "contract", "financial_record", "business_unit",
-]
+def _get_entity_tables() -> list[str]:
+    try:
+        from services.ontology_service import get_entity_table_names
+        return get_entity_table_names()
+    except Exception:
+        return [
+            "vendor", "customer", "employee", "product",
+            "transaction", "contract", "financial_record", "business_unit",
+        ]
+
+ENTITY_TABLES = _get_entity_tables()
 
 
 # ── Semantic search ─────────────────────────────────────────────────────────
@@ -43,6 +50,7 @@ def semantic_search(
     top_k: int = 10,
     entity_type: str | None = None,
     engine: Engine | None = None,
+    company_id: int | None = None,
 ) -> dict:
     """
     Search for entities matching a natural language query using vector similarity.
@@ -124,14 +132,21 @@ def semantic_search(
                 # Build SELECT with similarity score
                 col_list = ", ".join(_quote_identifier(c) for c in columns)
 
+                # Phase 5: optional company_id filter
+                where_clause = "WHERE embedding IS NOT NULL"
+                params = {"vec": vec_str, "limit": top_k}
+                if company_id is not None:
+                    where_clause += " AND company_id = :company_id"
+                    params["company_id"] = company_id
+
                 result = conn.execute(text(
                     f"SELECT {col_list}, "
                     f"1 - (embedding <=> :vec::vector) as similarity "
                     f"FROM {quoted} "
-                    f"WHERE embedding IS NOT NULL "
+                    f"{where_clause} "
                     f"ORDER BY embedding <=> :vec::vector "
                     f"LIMIT :limit"
-                ), {"vec": vec_str, "limit": top_k})
+                ), params)
 
                 for row in result:
                     row_dict = dict(zip(columns + ["similarity"], row))
@@ -174,6 +189,7 @@ def text_search(
     top_k: int = 10,
     entity_type: str | None = None,
     engine: Engine | None = None,
+    company_id: int | None = None,
 ) -> dict:
     """
     Fallback text search using ILIKE when vector search is unavailable.
@@ -206,11 +222,18 @@ def text_search(
                 col_list = ", ".join(_quote_identifier(c) for c in columns)
 
                 # Search canonical_name with ILIKE
+                # Phase 5: optional company_id filter
+                where_clause = "WHERE canonical_name ILIKE :pattern"
+                params = {"pattern": search_pattern, "limit": top_k}
+                if company_id is not None:
+                    where_clause += " AND company_id = :company_id"
+                    params["company_id"] = company_id
+
                 result = conn.execute(text(
                     f"SELECT {col_list} FROM {quoted} "
-                    f"WHERE canonical_name ILIKE :pattern "
+                    f"{where_clause} "
                     f"LIMIT :limit"
-                ), {"pattern": search_pattern, "limit": top_k})
+                ), params)
 
                 for row in result:
                     row_dict = dict(zip(columns, row))

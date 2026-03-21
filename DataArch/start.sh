@@ -144,8 +144,25 @@ fi
 mkdir -p outputs/ontology outputs/schema outputs/dataflow
 echo -e "${GREEN}[ok]${NC} Output directories ready"
 
-# ── 7. Run tests ─────────────────────────────────────────────
+# ── 7. Run database migrations ──────────────────────────────
+echo -e "${YELLOW}[..]${NC} Running database migrations..."
+if $PYTHON -m alembic upgrade head 2>&1; then
+    echo -e "${GREEN}[ok]${NC} Database migrations up to date"
+
+    # Seed ontology defaults
+    echo -e "${YELLOW}[..]${NC} Seeding ontology defaults..."
+    if $PYTHON -m seeds.ontology_defaults 2>&1; then
+        echo -e "${GREEN}[ok]${NC} Ontology defaults seeded"
+    else
+        echo -e "${YELLOW}[!!]${NC} Ontology seeding skipped (database may not be available)"
+    fi
+else
+    echo -e "${YELLOW}[!!]${NC} Migration skipped (database may not be available)"
+    echo -e "  Migrations will run automatically on first database connection."
+fi
 echo ""
+
+# ── 8. Run tests ─────────────────────────────────────────────
 echo -e "${YELLOW}[..]${NC} Running tests..."
 if $PYTHON -m pytest tests/ -q --tb=short 2>&1; then
     echo -e "${GREEN}[ok]${NC} All tests passed"
@@ -154,7 +171,7 @@ else
     echo -e "${RED}Some tests failed. The server will still start, but check the errors above.${NC}"
 fi
 
-# ── 8. Launch server ─────────────────────────────────────────
+# ── 9. Launch server ─────────────────────────────────────────
 PORT="${PORT:-8000}"
 echo ""
 echo -e "${CYAN}${BOLD}  Starting DataArch.AI server...${NC}"

@@ -87,12 +87,25 @@ def _format_schema_for_prompt(schema: dict) -> str:
     """
     Format the schema.json into a concise text representation
     that fits efficiently in the Claude prompt.
+
+    Phase 5: Highlights portfolio_company as the central table and
+    annotates company_id columns on entity tables.
     """
     lines = ["Database Schema:"]
+
+    try:
+        from services.ontology_service import get_entity_table_names
+        entity_tables = set(get_entity_table_names())
+    except Exception:
+        entity_tables = {
+            "vendor", "customer", "employee", "product",
+            "transaction", "contract", "financial_record", "business_unit",
+        }
 
     for table in schema.get("tables", []):
         tname = table["table_name"]
         cols = []
+        has_company_id = False
         for col in table["columns"]:
             col_desc = f"{col['name']} {col['type']}"
             if col.get("primary_key"):
@@ -101,13 +114,23 @@ def _format_schema_for_prompt(schema: dict) -> str:
                 col_desc += " UNIQUE"
             if not col.get("nullable", True):
                 col_desc += " NOT NULL"
+            if col["name"] == "company_id":
+                has_company_id = True
             cols.append(col_desc)
 
         fks = []
         for fk in table.get("foreign_keys", []):
             fks.append(f"FK: {fk['column']} → {fk['references_table']}.{fk['references_column']}")
 
-        lines.append(f"\nTable: {tname} ({table.get('record_count', '?')} records)")
+        # Annotate table role
+        if tname == "portfolio_company":
+            role = " [PORTFOLIO — central company table]"
+        elif tname in entity_tables and has_company_id:
+            role = " [entity — has company_id for portfolio filtering]"
+        else:
+            role = ""
+
+        lines.append(f"\nTable: {tname} ({table.get('record_count', '?')} records){role}")
         lines.append(f"  Columns: {', '.join(cols)}")
         if fks:
             lines.append(f"  {'; '.join(fks)}")
@@ -119,6 +142,15 @@ def _format_schema_for_prompt(schema: dict) -> str:
 
 ANALYST_SYSTEM_PROMPT = """You are a SQL analytics expert for DataArch.AI, a Private Equity data platform.
 You write PostgreSQL queries to answer business questions about PE portfolio companies.
+
+PORTFOLIO ARCHITECTURE:
+- The portfolio_company table stores all portfolio companies (id, name, slug, sector, fund, status).
+- Every entity table (vendor, customer, employee, product, "transaction", contract, financial_record, business_unit) has a company_id BIGINT column referencing portfolio_company(id).
+- company_id can be NULL for legacy data without a company assignment.
+- When a [CONTEXT: Filter...company_id = N] prefix appears in the question, add WHERE company_id = N to all relevant entity table queries.
+- For cross-portfolio questions (e.g. "which vendors appear across multiple companies"), GROUP BY canonical_name and use HAVING COUNT(DISTINCT company_id) >= N.
+- JOIN with portfolio_company ON entity_table.company_id = portfolio_company.id to include company names in results.
+- Use portfolio_company for company-level questions (sector, fund, acquisition_date, status).
 
 IMPORTANT SQL RULES:
 - Only generate SELECT queries (never INSERT, UPDATE, DELETE, DROP, etc.)
@@ -283,6 +315,7 @@ def ask(
     question: str,
     schema: dict | None = None,
     max_rows: int = 100,
+    company_id: int | None = None,
 ) -> dict:
     """
     Answer a business question using natural language SQL analytics.
@@ -296,15 +329,25 @@ def ask(
         question: Natural language business question
         schema: Database schema (loads from file if None)
         max_rows: Maximum rows to return
+        company_id: If set, prepend company context to focus queries (Phase 5)
 
     Returns:
         AnalyticsResponse as a dict with question, sql, answer, data, etc.
     """
     response = AnalyticsResponse(question=question, sql="", explanation="")
 
+    # Phase 5: prepend company context if scoped to a specific company
+    effective_question = question
+    if company_id is not None:
+        effective_question = (
+            f"[CONTEXT: Filter all entity tables to company_id = {company_id}. "
+            f"Add WHERE company_id = {company_id} to relevant queries.] "
+            f"{question}"
+        )
+
     # 1. Generate SQL
     try:
-        sql_result = generate_sql(question, schema)
+        sql_result = generate_sql(effective_question, schema)
         response.sql = sql_result.sql
         response.explanation = sql_result.explanation
     except Exception as e:

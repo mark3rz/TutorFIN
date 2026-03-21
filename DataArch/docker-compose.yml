@@ -51,6 +51,8 @@ services:
       VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
       DATAARCH_MODEL: ${DATAARCH_MODEL:-claude-sonnet-4-5-20250929}
       DATAARCH_ENV: ${DATAARCH_ENV:-docker}
+      JWT_SECRET: ${JWT_SECRET:-dataarch-dev-secret-change-in-production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:

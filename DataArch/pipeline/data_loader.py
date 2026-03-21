@@ -173,6 +173,7 @@ def load_entities(
     registry: EntityRegistry | None = None,
     schema: dict | None = None,
     engine: Engine | None = None,
+    company_id: int | None = None,
 ) -> dict:
     """
     Load entity registry data into the PostgreSQL database.
@@ -180,12 +181,13 @@ def load_entities(
     For each entity in the registry:
       1. Determine the target table from its ontology_type
       2. Transform attribute values to match column types
-      3. UPSERT using INSERT ... ON CONFLICT (canonical_name) DO UPDATE
+      3. UPSERT using INSERT ... ON CONFLICT DO UPDATE
 
     Args:
         registry: Entity registry to load (loads from disk if None)
         schema: Schema dict for column type info (loads from disk if None)
         engine: SQLAlchemy engine (uses default if None)
+        company_id: Portfolio company ID to associate entities with (Phase 5)
 
     Returns:
         {
@@ -243,7 +245,8 @@ def load_entities(
                 results["by_table"][table] = {"inserted": 0, "updated": 0, "failed": 0}
 
             try:
-                _upsert_entity(conn, table, record, col_types[table])
+                _upsert_entity(conn, table, record, col_types[table],
+                               company_id=company_id)
 
                 # We can't easily distinguish insert vs update with ON CONFLICT,
                 # so we check if xmax is set (PostgreSQL trick for detecting updates)
@@ -269,21 +272,34 @@ def load_entities(
     return results
 
 
-def _upsert_entity(conn, table: str, record, col_types: dict) -> None:
+def _upsert_entity(
+    conn,
+    table: str,
+    record,
+    col_types: dict,
+    company_id: int | None = None,
+) -> None:
     """
     UPSERT a single entity into its target table.
 
-    Uses: INSERT ... ON CONFLICT (canonical_name) DO UPDATE SET ...
+    Phase 5: Uses composite conflict key (canonical_name + COALESCE(company_id, -1))
+    to support per-company entity isolation. The same vendor name can exist under
+    different companies as separate rows.
     """
     quoted_table = _quote_identifier(table)
 
     # Build column → value mapping
     columns = {"canonical_name": record.canonical_name}
 
+    # Add company_id if provided (Phase 5)
+    if company_id is not None and "company_id" in col_types:
+        columns["company_id"] = company_id
+
     # Transform each attribute
     for attr_key, attr_val in record.attributes.items():
         col_name = _sanitize_column_name(attr_key)
-        if col_name in ("id", "canonical_name", "created_at", "updated_at", "source_file"):
+        if col_name in ("id", "canonical_name", "company_id",
+                         "created_at", "updated_at", "source_file"):
             continue
         if col_name not in col_types:
             continue  # Column not in schema — skip
@@ -305,8 +321,9 @@ def _upsert_entity(conn, table: str, record, col_types: dict) -> None:
     quoted_cols = [_quote_identifier(c) for c in col_names]
     placeholders = [f":{c}" for c in col_names]
 
-    # Update all columns except canonical_name on conflict
-    update_cols = [c for c in col_names if c != "canonical_name"]
+    # Update all columns except the conflict key columns on conflict
+    conflict_cols = {"canonical_name", "company_id"}
+    update_cols = [c for c in col_names if c not in conflict_cols]
     update_set = ", ".join(
         f"{_quote_identifier(c)} = :{c}" for c in update_cols
     )
@@ -317,10 +334,15 @@ def _upsert_entity(conn, table: str, record, col_types: dict) -> None:
     else:
         update_set = "updated_at = NOW()"
 
+    # Phase 5: Composite conflict target using the functional unique index
+    # ON CONFLICT ON CONSTRAINT isn't compatible with functional indexes,
+    # so we use the index expression directly
+    conflict_target = "(canonical_name, COALESCE(company_id, -1))"
+
     sql = (
         f"INSERT INTO {quoted_table} ({', '.join(quoted_cols)})"
         f" VALUES ({', '.join(placeholders)})"
-        f" ON CONFLICT (canonical_name) DO UPDATE SET {update_set}"
+        f" ON CONFLICT {conflict_target} DO UPDATE SET {update_set}"
     )
 
     conn.execute(text(sql), columns)
@@ -332,10 +354,17 @@ def load_from_files(
     registry_path: Path | None = None,
     schema_path: Path | None = None,
     engine: Engine | None = None,
+    company_id: int | None = None,
 ) -> dict:
     """
     Load entity data from JSON files into the database.
     Convenience wrapper that loads registry and schema from disk.
+
+    Args:
+        registry_path: Path to entity registry JSON (uses default if None)
+        schema_path: Path to schema JSON (uses default if None)
+        engine: SQLAlchemy engine (uses default if None)
+        company_id: Portfolio company ID to associate entities with (Phase 5)
     """
     registry = load_registry(registry_path)
 
@@ -344,4 +373,5 @@ def load_from_files(
     if sp.exists():
         schema = json.loads(sp.read_text())
 
-    return load_entities(registry=registry, schema=schema, engine=engine)
+    return load_entities(registry=registry, schema=schema, engine=engine,
+                         company_id=company_id)
