@@ -1,0 +1,488 @@
+{
+  "entries": {
+    "e6ac571716b9017c": {
+      "id": "e6ac571716b9017c",
+      "ontology_type": "vendor",
+      "confidence": "high",
+      "canonical_name": "Apex Manufacturing LLC",
+      "aliases": [
+        "Apex Mfg",
+        "APEX MANUFACTURING"
+      ],
+      "source_file": "purchase_orders_2024.xlsx",
+      "source_entity_type": "vendor",
+      "source_attributes": {},
+      "attributes": {
+        "vendor_id": "V-1001",
+        "legal_name": "Apex Manufacturing LLC",
+        "payment_terms": "Net 30",
+        "category": "Raw Materials"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from vendor master / invoice data"
+    },
+    "87e003cbf327ef97": {
+      "id": "87e003cbf327ef97",
+      "ontology_type": "vendor",
+      "confidence": "high",
+      "canonical_name": "CloudScale Technologies",
+      "aliases": [
+        "CloudScale",
+        "CloudScale Tech"
+      ],
+      "source_file": "vendor_master.csv",
+      "source_entity_type": "vendor",
+      "source_attributes": {},
+      "attributes": {
+        "vendor_id": "V-1002",
+        "legal_name": "CloudScale Technologies Inc.",
+        "payment_terms": "Net 45",
+        "category": "SaaS"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from vendor master / invoice data"
+    },
+    "bd52711d9dc093e0": {
+      "id": "bd52711d9dc093e0",
+      "ontology_type": "vendor",
+      "confidence": "high",
+      "canonical_name": "Delta Logistics Group",
+      "aliases": [
+        "Delta Logistics",
+        "DLG"
+      ],
+      "source_file": "ap_aging_report.pdf",
+      "source_entity_type": "vendor",
+      "source_attributes": {},
+      "attributes": {
+        "vendor_id": "V-1003",
+        "legal_name": "Delta Logistics Group LP",
+        "payment_terms": "Net 15",
+        "category": "Shipping & Freight"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from vendor master / invoice data"
+    },
+    "1dde8d57083b2020": {
+      "id": "1dde8d57083b2020",
+      "ontology_type": "vendor",
+      "confidence": "high",
+      "canonical_name": "Morrison & Associates",
+      "aliases": [
+        "Morrison Legal",
+        "M&A LLP"
+      ],
+      "source_file": "legal_invoices_q4.pdf",
+      "source_entity_type": "vendor",
+      "source_attributes": {},
+      "attributes": {
+        "vendor_id": "V-1004",
+        "legal_name": "Morrison & Associates LLP",
+        "payment_terms": "Upon Receipt",
+        "category": "Legal Services"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from vendor master / invoice data"
+    },
+    "71fa33ce31ab7f99": {
+      "id": "71fa33ce31ab7f99",
+      "ontology_type": "customer",
+      "confidence": "high",
+      "canonical_name": "Meridian Health Systems",
+      "aliases": [
+        "Meridian Health",
+        "MHS"
+      ],
+      "source_file": "revenue_report_2024.xlsx",
+      "source_entity_type": "customer",
+      "source_attributes": {},
+      "attributes": {
+        "customer_id": "C-2001",
+        "legal_name": "Meridian Health Systems Inc.",
+        "segment": "Enterprise",
+        "revenue_tier": "Tier 1"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from revenue / AR data"
+    },
+    "29f8d2a843615f69": {
+      "id": "29f8d2a843615f69",
+      "ontology_type": "customer",
+      "confidence": "high",
+      "canonical_name": "Pacific Retail Group",
+      "aliases": [
+        "Pacific Retail",
+        "PRG"
+      ],
+      "source_file": "ar_aging_report.pdf",
+      "source_entity_type": "customer",
+      "source_attributes": {},
+      "attributes": {
+        "customer_id": "C-2002",
+        "legal_name": "Pacific Retail Group Corp.",
+        "segment": "Mid-Market",
+        "revenue_tier": "Tier 2"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from revenue / AR data"
+    },
+    "136274f92ad1b014": {
+      "id": "136274f92ad1b014",
+      "ontology_type": "customer",
+      "confidence": "high",
+      "canonical_name": "Northwind Distributors",
+      "aliases": [
+        "Northwind",
+        "NW Distributors"
+      ],
+      "source_file": "customer_list.csv",
+      "source_entity_type": "customer",
+      "source_attributes": {},
+      "attributes": {
+        "customer_id": "C-2003",
+        "legal_name": "Northwind Distributors LLC",
+        "segment": "SMB",
+        "revenue_tier": "Tier 3"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from revenue / AR data"
+    },
+    "4418463856b37864": {
+      "id": "4418463856b37864",
+      "ontology_type": "employee",
+      "confidence": "high",
+      "canonical_name": "Sarah Chen",
+      "aliases": [],
+      "source_file": "org_chart.docx",
+      "source_entity_type": "employee",
+      "source_attributes": {},
+      "attributes": {
+        "employee_id": "E-3001",
+        "role": "Chief Financial Officer",
+        "department": "Finance",
+        "compensation_band": "Executive"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from HR / org chart data"
+    },
+    "2c26dc6540f9c779": {
+      "id": "2c26dc6540f9c779",
+      "ontology_type": "employee",
+      "confidence": "high",
+      "canonical_name": "Marcus Williams",
+      "aliases": [
+        "M. Williams"
+      ],
+      "source_file": "org_chart.docx",
+      "source_entity_type": "employee",
+      "source_attributes": {},
+      "attributes": {
+        "employee_id": "E-3002",
+        "role": "VP of Operations",
+        "department": "Operations",
+        "compensation_band": "Senior Leadership"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from HR / org chart data"
+    },
+    "2efe768a30bd3d26": {
+      "id": "2efe768a30bd3d26",
+      "ontology_type": "employee",
+      "confidence": "high",
+      "canonical_name": "Jennifer Park",
+      "aliases": [
+        "J. Park"
+      ],
+      "source_file": "payroll_summary.xlsx",
+      "source_entity_type": "employee",
+      "source_attributes": {},
+      "attributes": {
+        "employee_id": "E-3003",
+        "role": "Controller",
+        "department": "Finance",
+        "compensation_band": "Director"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from HR / org chart data"
+    },
+    "e791ec55553344af": {
+      "id": "e791ec55553344af",
+      "ontology_type": "product",
+      "confidence": "high",
+      "canonical_name": "ProLine Widget Assembly",
+      "aliases": [
+        "ProLine Widget",
+        "Widget Assy"
+      ],
+      "source_file": "product_catalog.xlsx",
+      "source_entity_type": "product",
+      "source_attributes": {},
+      "attributes": {
+        "product_id": "P-4001",
+        "name": "ProLine Widget Assembly",
+        "unit_price": "$245.00",
+        "category": "Manufactured Goods",
+        "revenue_type": "Product Sale"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from product catalog / service agreements"
+    },
+    "d7bcca5ad8f2b8be": {
+      "id": "d7bcca5ad8f2b8be",
+      "ontology_type": "product",
+      "confidence": "high",
+      "canonical_name": "Enterprise Support Plan",
+      "aliases": [
+        "ESP",
+        "Enterprise Support"
+      ],
+      "source_file": "service_agreements.pdf",
+      "source_entity_type": "product",
+      "source_attributes": {},
+      "attributes": {
+        "product_id": "P-4002",
+        "name": "Enterprise Support Plan",
+        "unit_price": "$5,000.00",
+        "category": "Services",
+        "revenue_type": "Recurring"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from product catalog / service agreements"
+    },
+    "03d66f8c97c64c25": {
+      "id": "03d66f8c97c64c25",
+      "ontology_type": "transaction",
+      "confidence": "high",
+      "canonical_name": "Invoice #INV-2024-0847",
+      "aliases": [],
+      "source_file": "ap_aging_report.pdf",
+      "source_entity_type": "invoice",
+      "source_attributes": {},
+      "attributes": {
+        "transaction_id": "T-5001",
+        "amount": "$12,450.00",
+        "currency": "USD",
+        "date": "2024-11-15",
+        "counterparty": "Apex Manufacturing LLC",
+        "direction": "outbound",
+        "vendor_id": "V-1001"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from financial documents"
+    },
+    "92dc440220795785": {
+      "id": "92dc440220795785",
+      "ontology_type": "transaction",
+      "confidence": "high",
+      "canonical_name": "Payment #PMT-2024-1192",
+      "aliases": [],
+      "source_file": "revenue_report_2024.xlsx",
+      "source_entity_type": "invoice",
+      "source_attributes": {},
+      "attributes": {
+        "transaction_id": "T-5002",
+        "amount": "$67,500.00",
+        "currency": "USD",
+        "date": "2024-12-01",
+        "counterparty": "Meridian Health Systems",
+        "direction": "inbound",
+        "customer_id": "C-2001"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from financial documents"
+    },
+    "fba9d92966a0e93c": {
+      "id": "fba9d92966a0e93c",
+      "ontology_type": "transaction",
+      "confidence": "medium",
+      "canonical_name": "PO #PO-2024-0331",
+      "aliases": [],
+      "source_file": "purchase_orders_2024.xlsx",
+      "source_entity_type": "invoice",
+      "source_attributes": {},
+      "attributes": {
+        "transaction_id": "T-5003",
+        "amount": "$8,200.00",
+        "currency": "USD",
+        "date": "2024-10-22",
+        "counterparty": "Delta Logistics Group",
+        "direction": "outbound",
+        "vendor_id": "V-1003"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from financial documents"
+    },
+    "dbea2d36deb3ccd1": {
+      "id": "dbea2d36deb3ccd1",
+      "ontology_type": "transaction",
+      "confidence": "high",
+      "canonical_name": "Wire Transfer #WT-89012",
+      "aliases": [],
+      "source_file": "bank_statement_q3.pdf",
+      "source_entity_type": "invoice",
+      "source_attributes": {},
+      "attributes": {
+        "transaction_id": "T-5004",
+        "amount": "$125,000.00",
+        "currency": "USD",
+        "date": "2024-09-30",
+        "counterparty": "Pacific Retail Group",
+        "direction": "inbound",
+        "customer_id": "C-2002"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from financial documents"
+    },
+    "1cfd7c9d00ee701a": {
+      "id": "1cfd7c9d00ee701a",
+      "ontology_type": "transaction",
+      "confidence": "medium",
+      "canonical_name": "Expense Report #EXP-445",
+      "aliases": [],
+      "source_file": "legal_invoices_q4.pdf",
+      "source_entity_type": "invoice",
+      "source_attributes": {},
+      "attributes": {
+        "transaction_id": "T-5005",
+        "amount": "$3,750.00",
+        "currency": "USD",
+        "date": "2024-11-28",
+        "counterparty": "Morrison & Associates",
+        "direction": "outbound",
+        "vendor_id": "V-1004"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from financial documents"
+    },
+    "5d852b28e8655e6e": {
+      "id": "5d852b28e8655e6e",
+      "ontology_type": "contract",
+      "confidence": "high",
+      "canonical_name": "MSA \u2014 CloudScale Technologies",
+      "aliases": [
+        "CloudScale MSA"
+      ],
+      "source_file": "service_agreements.pdf",
+      "source_entity_type": "contract",
+      "source_attributes": {},
+      "attributes": {
+        "contract_id": "K-6001",
+        "parties": "PortCo Inc., CloudScale Technologies Inc.",
+        "effective_date": "2023-01-15",
+        "expiry_date": "2026-01-14",
+        "value": "$180,000",
+        "type": "MSA",
+        "vendor_id": "V-1002"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from legal / service agreement documents"
+    },
+    "725b6000514ffe13": {
+      "id": "725b6000514ffe13",
+      "ontology_type": "contract",
+      "confidence": "high",
+      "canonical_name": "NDA \u2014 Meridian Health Systems",
+      "aliases": [
+        "Meridian NDA"
+      ],
+      "source_file": "legal_invoices_q4.pdf",
+      "source_entity_type": "contract",
+      "source_attributes": {},
+      "attributes": {
+        "contract_id": "K-6002",
+        "parties": "PortCo Inc., Meridian Health Systems Inc.",
+        "effective_date": "2024-03-01",
+        "expiry_date": "2027-02-28",
+        "value": "N/A",
+        "type": "NDA",
+        "customer_id": "C-2001"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from legal / service agreement documents"
+    },
+    "3475727d9c806216": {
+      "id": "3475727d9c806216",
+      "ontology_type": "financial_record",
+      "confidence": "high",
+      "canonical_name": "Q3 2024 Income Statement",
+      "aliases": [
+        "Q3 P&L",
+        "Q3 Income Stmt"
+      ],
+      "source_file": "financial_statements_q3.pdf",
+      "source_entity_type": "financial_record",
+      "source_attributes": {},
+      "attributes": {
+        "period": "Q3 2024",
+        "record_type": "Income Statement",
+        "total_value": "$2,340,000",
+        "currency": "USD"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from financial statements"
+    },
+    "73a4ebf377030f05": {
+      "id": "73a4ebf377030f05",
+      "ontology_type": "financial_record",
+      "confidence": "high",
+      "canonical_name": "FY2024 Trial Balance",
+      "aliases": [
+        "2024 TB"
+      ],
+      "source_file": "trial_balance_2024.xlsx",
+      "source_entity_type": "financial_record",
+      "source_attributes": {},
+      "attributes": {
+        "period": "FY 2024",
+        "record_type": "Trial Balance",
+        "total_value": "$18,750,000",
+        "currency": "USD"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from financial statements"
+    },
+    "7d7f0e98214056dd": {
+      "id": "7d7f0e98214056dd",
+      "ontology_type": "business_unit",
+      "confidence": "high",
+      "canonical_name": "PortCo Inc.",
+      "aliases": [
+        "PortCo",
+        "Portfolio Company"
+      ],
+      "source_file": "org_chart.docx",
+      "source_entity_type": "business_unit",
+      "source_attributes": {},
+      "attributes": {
+        "unit_id": "BU-7001",
+        "name": "PortCo Inc.",
+        "parent_entity": "Summit Capital Partners Fund III",
+        "headcount": "142"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from organizational data"
+    },
+    "bed96e9e132814c6": {
+      "id": "bed96e9e132814c6",
+      "ontology_type": "business_unit",
+      "confidence": "high",
+      "canonical_name": "West Coast Division",
+      "aliases": [
+        "West Coast",
+        "WCD"
+      ],
+      "source_file": "org_chart.docx",
+      "source_entity_type": "business_unit",
+      "source_attributes": {},
+      "attributes": {
+        "unit_id": "BU-7002",
+        "name": "West Coast Division",
+        "parent_entity": "PortCo Inc.",
+        "headcount": "58"
+      },
+      "mapped_at": "2026-03-20T18:42:47.065355",
+      "mapping_notes": "Classified from organizational data"
+    }
+  },
+  "updated_at": "2026-03-20T18:42:47.065355"
+}

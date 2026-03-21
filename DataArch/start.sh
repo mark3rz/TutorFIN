@@ -76,11 +76,28 @@ else
     echo -e "${GREEN}[ok]${NC} .env file found"
 fi
 
-# ── 5. Create output directories ─────────────────────────────
+# ── 5. Check for database ────────────────────────────────────
+if [ -z "$DATABASE_URL" ]; then
+    DEFAULT_DB="postgresql://dataarch:dataarch@localhost:5432/dataarch"
+    echo -e "${YELLOW}[..] DATABASE_URL not set. Using default: ${DEFAULT_DB}${NC}"
+    echo -e "  Database endpoints (POST /database/*) require a running PostgreSQL instance."
+    echo ""
+    echo -e "  Quick setup with Docker:"
+    echo -e "    ${BOLD}docker run -d --name dataarch-pg -p 5432:5432 \\${NC}"
+    echo -e "    ${BOLD}  -e POSTGRES_USER=dataarch \\${NC}"
+    echo -e "    ${BOLD}  -e POSTGRES_PASSWORD=dataarch \\${NC}"
+    echo -e "    ${BOLD}  -e POSTGRES_DB=dataarch \\${NC}"
+    echo -e "    ${BOLD}  postgres:16${NC}"
+    echo ""
+else
+    echo -e "${GREEN}[ok]${NC} DATABASE_URL configured"
+fi
+
+# ── 6. Create output directories ─────────────────────────────
 mkdir -p outputs/ontology outputs/schema outputs/dataflow
 echo -e "${GREEN}[ok]${NC} Output directories ready"
 
-# ── 6. Run tests ─────────────────────────────────────────────
+# ── 7. Run tests ─────────────────────────────────────────────
 echo ""
 echo -e "${YELLOW}[..]${NC} Running tests..."
 if $PYTHON -m pytest tests/ -q --tb=short 2>&1; then
@@ -90,7 +107,7 @@ else
     echo -e "${RED}Some tests failed. The server will still start, but check the errors above.${NC}"
 fi
 
-# ── 7. Launch server ─────────────────────────────────────────
+# ── 8. Launch server ─────────────────────────────────────────
 PORT="${PORT:-8000}"
 echo ""
 echo -e "${CYAN}${BOLD}  Starting DataArch.AI server...${NC}"
@@ -98,6 +115,7 @@ echo ""
 echo -e "  Demo UI:    ${BOLD}http://localhost:${PORT}${NC}"
 echo -e "  API docs:   ${BOLD}http://localhost:${PORT}/docs${NC}"
 echo -e "  Health:     ${BOLD}http://localhost:${PORT}/health${NC}"
+echo -e "  DB Health:  ${BOLD}http://localhost:${PORT}/database/health${NC}"
 echo ""
 echo -e "  Press ${BOLD}Ctrl+C${NC} to stop."
 echo ""

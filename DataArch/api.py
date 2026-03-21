@@ -18,6 +18,13 @@ Endpoints:
   POST /dataflow/generate   Generate data flow graph from registry + schema
   GET  /dataflow            Get the data flow graph JSON
 
+  POST /database/create     Execute DDL, create all tables in PostgreSQL
+  POST /database/load       Load entity registry into database tables
+  POST /database/reset      Drop and recreate all tables
+  GET  /database/health     Check database connectivity
+  GET  /database/stats      Row counts and table sizes
+  POST /database/query      Execute read-only SQL query
+
   GET  /                    Demo UI (Layer 5)
   GET  /static/*            Static file serving for frontend assets
 """
@@ -30,6 +37,7 @@ from fastapi.staticfiles import StaticFiles
 import shutil
 import tempfile
 
+import config
 from pipeline.ingest import ingest
 from pipeline.schema import ParsedDocument
 from pipeline.ontology.mapper import map_document, map_all_outputs, map_from_parsed_json
@@ -40,7 +48,7 @@ from pipeline.dataflow import generate_and_save as generate_dataflow_and_save, D
 app = FastAPI(
     title="DataArch.AI API",
     description="Upload business documents. Get structured, AI-ready data back.",
-    version="0.3.0",
+    version=config.APP_VERSION,
 )
 
 OUTPUTS_DIR = Path("outputs")
@@ -66,7 +74,7 @@ def root():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "product": "DataArch.AI", "version": "0.3.0"}
+    return {"status": "ok", "product": config.APP_NAME, "version": config.APP_VERSION}
 
 
 # ── Layer 1: Ingestion ──────────────────────────────────────────────────────
@@ -240,3 +248,109 @@ def get_dataflow():
             detail="Data flow graph not generated yet. Run POST /dataflow/generate first.",
         )
     return JSONResponse(content=json.loads(path.read_text()))
+
+
+# ── Database Management (Phase 2) ──────────────────────────────────────────
+
+@app.get("/database/health")
+def database_health():
+    """Check database connectivity and return status info."""
+    from pipeline.database import check_health
+    return JSONResponse(content=check_health())
+
+
+@app.post("/database/create")
+def database_create():
+    """
+    Execute the generated DDL against the PostgreSQL database.
+    Creates all tables defined in schema.json.
+    Tables are created in topological order with IF NOT EXISTS.
+    """
+    from pipeline.database import execute_schema, load_schema_from_file
+
+    try:
+        schema = load_schema_from_file()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    try:
+        result = execute_schema(schema)
+        return JSONResponse(content=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Schema execution failed: {e}")
+
+
+@app.post("/database/load")
+def database_load():
+    """
+    Load entity registry data into the PostgreSQL database.
+    Transforms attribute values and UPSERTs into the appropriate tables.
+    """
+    from pipeline.data_loader import load_from_files
+
+    try:
+        result = load_from_files()
+        return JSONResponse(content=result)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Data load failed: {e}")
+
+
+@app.post("/database/reset")
+def database_reset():
+    """
+    Drop and recreate all DataArch tables.
+    WARNING: This permanently deletes all data in the tables.
+    """
+    from pipeline.database import drop_all_tables, execute_schema, load_schema_from_file
+
+    try:
+        schema = load_schema_from_file()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    try:
+        drop_result = drop_all_tables(schema)
+        create_result = execute_schema(schema)
+        return JSONResponse(content={
+            "dropped": drop_result,
+            "created": create_result,
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database reset failed: {e}")
+
+
+@app.get("/database/stats")
+def database_stats():
+    """Get row counts and table sizes for all DataArch tables."""
+    from pipeline.database import get_table_stats
+
+    try:
+        stats = get_table_stats()
+        return JSONResponse(content=stats)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not get stats: {e}")
+
+
+@app.post("/database/query")
+def database_query(body: dict):
+    """
+    Execute a read-only SQL query against the database.
+    Only SELECT and WITH (CTE) queries are allowed.
+
+    Request body: {"sql": "SELECT * FROM vendor LIMIT 10"}
+    """
+    from pipeline.database import execute_readonly_query
+
+    sql = body.get("sql", "").strip()
+    if not sql:
+        raise HTTPException(status_code=400, detail="Missing 'sql' field in request body.")
+
+    try:
+        result = execute_readonly_query(sql, max_rows=body.get("max_rows", 500))
+        return JSONResponse(content=result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Query failed: {e}")

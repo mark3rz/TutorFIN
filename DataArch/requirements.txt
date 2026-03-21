@@ -12,6 +12,10 @@ mail-parser>=3.15.0       # Email (.eml, .msg)
 # LLM
 anthropic>=0.34.2
 
+# Database (Phase 2)
+sqlalchemy>=2.0.0         # ORM & connection pooling
+psycopg2-binary>=2.9.9    # PostgreSQL driver
+
 # Data modeling & utilities
 pydantic>=2.9.0
 python-dotenv>=1.0.1

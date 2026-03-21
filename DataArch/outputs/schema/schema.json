@@ -1,0 +1,694 @@
+{
+  "version": "1.1",
+  "generated_at": "2026-03-20T19:13:24.112904",
+  "tables": [
+    {
+      "table_name": "business_unit",
+      "record_count": 2,
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "nullable": false,
+          "primary_key": true
+        },
+        {
+          "name": "canonical_name",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false,
+          "unique": true
+        },
+        {
+          "name": "headcount",
+          "type": "BIGINT",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "parent_entity",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "unit_id",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "source_file",
+          "type": "VARCHAR(500)",
+          "nullable": true,
+          "primary_key": false
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "canonical_name"
+          ],
+          "unique": true
+        }
+      ]
+    },
+    {
+      "table_name": "customer",
+      "record_count": 3,
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "nullable": false,
+          "primary_key": true
+        },
+        {
+          "name": "canonical_name",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false,
+          "unique": true
+        },
+        {
+          "name": "customer_id",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "legal_name",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "revenue_tier",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "segment",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "source_file",
+          "type": "VARCHAR(500)",
+          "nullable": true,
+          "primary_key": false
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "canonical_name"
+          ],
+          "unique": true
+        }
+      ]
+    },
+    {
+      "table_name": "financial_record",
+      "record_count": 2,
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "nullable": false,
+          "primary_key": true
+        },
+        {
+          "name": "canonical_name",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false,
+          "unique": true
+        },
+        {
+          "name": "currency",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "period",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "record_type",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "total_value",
+          "type": "DECIMAL(18,2)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "source_file",
+          "type": "VARCHAR(500)",
+          "nullable": true,
+          "primary_key": false
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "canonical_name"
+          ],
+          "unique": true
+        }
+      ]
+    },
+    {
+      "table_name": "product",
+      "record_count": 2,
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "nullable": false,
+          "primary_key": true
+        },
+        {
+          "name": "canonical_name",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false,
+          "unique": true
+        },
+        {
+          "name": "category",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "product_id",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "revenue_type",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "unit_price",
+          "type": "DECIMAL(18,2)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "source_file",
+          "type": "VARCHAR(500)",
+          "nullable": true,
+          "primary_key": false
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "canonical_name"
+          ],
+          "unique": true
+        }
+      ]
+    },
+    {
+      "table_name": "vendor",
+      "record_count": 4,
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "nullable": false,
+          "primary_key": true
+        },
+        {
+          "name": "canonical_name",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false,
+          "unique": true
+        },
+        {
+          "name": "category",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "legal_name",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "payment_terms",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "vendor_id",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "source_file",
+          "type": "VARCHAR(500)",
+          "nullable": true,
+          "primary_key": false
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "columns": [
+            "canonical_name"
+          ],
+          "unique": true
+        }
+      ]
+    },
+    {
+      "table_name": "employee",
+      "record_count": 3,
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "nullable": false,
+          "primary_key": true
+        },
+        {
+          "name": "canonical_name",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false,
+          "unique": true
+        },
+        {
+          "name": "compensation_band",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "department",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "employee_id",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "role",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "source_file",
+          "type": "VARCHAR(500)",
+          "nullable": true,
+          "primary_key": false
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "column": "department",
+          "references_table": "business_unit",
+          "references_column": "canonical_name"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "canonical_name"
+          ],
+          "unique": true
+        },
+        {
+          "columns": [
+            "department"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "table_name": "contract",
+      "record_count": 2,
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "nullable": false,
+          "primary_key": true
+        },
+        {
+          "name": "canonical_name",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false,
+          "unique": true
+        },
+        {
+          "name": "contract_id",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "customer_id",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "effective_date",
+          "type": "DATE",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "expiry_date",
+          "type": "DATE",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "parties",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "type",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "value",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "vendor_id",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "source_file",
+          "type": "VARCHAR(500)",
+          "nullable": true,
+          "primary_key": false
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "column": "vendor_id",
+          "references_table": "vendor",
+          "references_column": "canonical_name"
+        },
+        {
+          "column": "customer_id",
+          "references_table": "customer",
+          "references_column": "canonical_name"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "canonical_name"
+          ],
+          "unique": true
+        },
+        {
+          "columns": [
+            "vendor_id"
+          ],
+          "unique": false
+        },
+        {
+          "columns": [
+            "customer_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "table_name": "transaction",
+      "record_count": 5,
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGSERIAL",
+          "nullable": false,
+          "primary_key": true
+        },
+        {
+          "name": "canonical_name",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false,
+          "unique": true
+        },
+        {
+          "name": "amount",
+          "type": "DECIMAL(18,2)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "counterparty",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "currency",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "customer_id",
+          "type": "VARCHAR(255)",
+          "nullable": true,
+          "primary_key": false
+        },
+        {
+          "name": "date",
+          "type": "DATE",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "direction",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "transaction_id",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "vendor_id",
+          "type": "VARCHAR(255)",
+          "nullable": false,
+          "primary_key": false
+        },
+        {
+          "name": "source_file",
+          "type": "VARCHAR(500)",
+          "nullable": true,
+          "primary_key": false
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "primary_key": false,
+          "default": "NOW()"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "column": "vendor_id",
+          "references_table": "vendor",
+          "references_column": "canonical_name"
+        },
+        {
+          "column": "customer_id",
+          "references_table": "customer",
+          "references_column": "canonical_name"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "canonical_name"
+          ],
+          "unique": true
+        },
+        {
+          "columns": [
+            "vendor_id"
+          ],
+          "unique": false
+        },
+        {
+          "columns": [
+            "customer_id"
+          ],
+          "unique": false
+        }
+      ]
+    }
+  ]
+}
