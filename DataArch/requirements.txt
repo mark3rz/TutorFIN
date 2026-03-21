@@ -16,6 +16,9 @@ anthropic>=0.34.2
 sqlalchemy>=2.0.0         # ORM & connection pooling
 psycopg2-binary>=2.9.9    # PostgreSQL driver
 
+# AI Integration (Phase 3)
+voyageai>=0.3.0           # Vector embeddings (requires VOYAGE_API_KEY)
+
 # Data modeling & utilities
 pydantic>=2.9.0
 python-dotenv>=1.0.1

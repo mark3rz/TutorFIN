@@ -8,6 +8,7 @@ Environment variables:
   DATABASE_URL       — PostgreSQL connection string
   ANTHROPIC_API_KEY  — Claude API key
   DATAARCH_MODEL     — LLM model identifier
+  VOYAGE_API_KEY     — Voyage AI API key (for embeddings)
   DATAARCH_ENV       — Environment name (dev/staging/prod)
 """
 
@@ -35,10 +36,16 @@ DB_ECHO: bool = os.getenv("DB_ECHO", "false").lower() in ("true", "1", "yes")
 ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 DATAARCH_MODEL: str = os.getenv("DATAARCH_MODEL", "claude-sonnet-4-5-20250929")
 
+# ── Embeddings ───────────────────────────────────────────────────────────────
+
+VOYAGE_API_KEY: str = os.getenv("VOYAGE_API_KEY", "")
+EMBEDDING_MODEL: str = os.getenv("DATAARCH_EMBEDDING_MODEL", "voyage-3")
+EMBEDDING_DIMENSION: int = int(os.getenv("DATAARCH_EMBEDDING_DIM", "1024"))
+
 # ── Application ──────────────────────────────────────────────────────────────
 
 DATAARCH_ENV: str = os.getenv("DATAARCH_ENV", "dev")
-APP_VERSION: str = "0.4.0"
+APP_VERSION: str = "0.5.0"
 APP_NAME: str = "DataArch.AI"
 
 # ── Paths ────────────────────────────────────────────────────────────────────

@@ -180,18 +180,28 @@ def test_query_blocks_grant():
 
 def test_query_allows_select():
     """SELECT queries should not raise ValueError (may fail on DB connect)."""
-    # This will fail with OperationalError (no DB), but NOT ValueError
-    with pytest.raises(Exception) as exc_info:
-        execute_readonly_query("SELECT 1")
-    # Should NOT be a ValueError — that means the query wasn't blocked
-    assert not isinstance(exc_info.value, ValueError)
+    # If a DB is available this will succeed; if not it'll raise OperationalError.
+    # Either way, it must NEVER raise ValueError (which means blocked).
+    try:
+        result = execute_readonly_query("SELECT 1")
+        # DB was reachable — result should be valid
+        assert result["row_count"] >= 1
+    except ValueError:
+        pytest.fail("SELECT query was incorrectly blocked by safety filter")
+    except Exception:
+        # OperationalError etc. from no DB — that's fine
+        pass
 
 
 def test_query_allows_with_cte():
     """WITH/CTE queries should not raise ValueError."""
-    with pytest.raises(Exception) as exc_info:
-        execute_readonly_query("WITH cte AS (SELECT 1) SELECT * FROM cte")
-    assert not isinstance(exc_info.value, ValueError)
+    try:
+        result = execute_readonly_query("WITH cte AS (SELECT 1) SELECT * FROM cte")
+        assert result["row_count"] >= 1
+    except ValueError:
+        pytest.fail("WITH/CTE query was incorrectly blocked by safety filter")
+    except Exception:
+        pass
 
 
 def test_query_blocks_select_with_embedded_delete():

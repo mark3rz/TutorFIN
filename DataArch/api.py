@@ -354,3 +354,93 @@ def database_query(body: dict):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
+
+
+# ── AI Integration (Phase 3) ──────────────────────────────────────────────
+
+@app.post("/ai/embed")
+def ai_embed():
+    """
+    Generate vector embeddings for all entities and store in PostgreSQL.
+    Requires: Voyage AI API key, pgvector extension, entities loaded in DB.
+    """
+    from pipeline.embeddings import setup_pgvector, embed_all_entities
+
+    try:
+        # Ensure pgvector is set up
+        setup_result = setup_pgvector()
+        if setup_result.get("errors"):
+            return JSONResponse(content={
+                "status": "pgvector_setup_failed",
+                "setup": setup_result,
+            }, status_code=500)
+
+        # Generate and store embeddings
+        embed_result = embed_all_entities()
+        return JSONResponse(content={
+            "status": "complete",
+            "setup": setup_result,
+            "embeddings": embed_result,
+        })
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except EnvironmentError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Embedding failed: {e}")
+
+
+@app.post("/ai/search")
+def ai_search(body: dict):
+    """
+    Semantic search across entity data using vector similarity.
+
+    Request body: {"query": "which vendors have long payment terms?", "top_k": 10}
+
+    Falls back to text search (ILIKE) if embeddings are not available.
+    """
+    from pipeline.ai_search import semantic_search, text_search
+
+    query = body.get("query", "").strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Missing 'query' field.")
+
+    top_k = body.get("top_k", 10)
+    entity_type = body.get("entity_type")
+
+    try:
+        result = semantic_search(query, top_k=top_k, entity_type=entity_type)
+        return JSONResponse(content=result)
+    except (EnvironmentError, ImportError):
+        # No Voyage API key — fall back to text search
+        try:
+            result = text_search(query, top_k=top_k, entity_type=entity_type)
+            result["note"] = "Vector search unavailable. Using text search fallback."
+            return JSONResponse(content=result)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Search failed: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Search failed: {e}")
+
+
+@app.post("/ai/ask")
+def ai_ask(body: dict):
+    """
+    Ask a business question in plain English.
+    Claude generates SQL, executes it, and returns a natural language answer.
+
+    Request body: {"question": "what is the total transaction volume by vendor?"}
+
+    Returns: {"question": "...", "sql": "...", "answer": "...", "rows": [...]}
+    """
+    from pipeline.ai_analyst import ask
+
+    question = body.get("question", "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Missing 'question' field.")
+
+    try:
+        result = ask(question, max_rows=body.get("max_rows", 100))
+        return JSONResponse(content=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analytics failed: {e}")
