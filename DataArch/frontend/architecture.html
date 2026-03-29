@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataArch.AI — System Architecture</title>
+<link rel="stylesheet" href="/static/design-system.css">
+<style>
+/* ── Architecture Map Styles ───────────────────────────────────── */
+body { background: var(--da-bg-2); min-height: 100vh; }
+.arch-container { max-width: 1200px; margin: 0 auto; padding: 40px 24px 80px; }
+
+/* Header */
+.arch-hero { text-align: center; margin-bottom: 48px; }
+.arch-hero h1 { font-family: var(--da-font-display); font-size: 36px; font-weight: 900; letter-spacing: -0.5px; color: var(--da-text); }
+.arch-hero h1 .accent { color: var(--da-blue); }
+.arch-hero .tagline { font-size: 18px; color: var(--da-text-2); margin-top: 8px; font-weight: 500; }
+.arch-hero .version-pill { display: inline-block; margin-top: 16px; padding: 4px 14px; border-radius: 20px; background: var(--da-blue-light); color: var(--da-blue); font-family: var(--da-font-mono); font-size: 12px; font-weight: 500; }
+
+/* KPI Strip */
+.kpi-strip { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-bottom: 48px; }
+.kpi-card { background: var(--da-surface); border: 1px solid var(--da-border); border-radius: var(--da-radius-lg); padding: 20px 28px; text-align: center; min-width: 150px; flex: 1; max-width: 200px; box-shadow: var(--da-shadow-sm); }
+.kpi-val { font-family: var(--da-font-display); font-size: 32px; font-weight: 900; }
+.kpi-val.blue { color: var(--da-blue); }
+.kpi-val.green { color: var(--da-green); }
+.kpi-val.purple { color: var(--da-purple); }
+.kpi-val.amber { color: var(--da-amber); }
+.kpi-val.teal { color: var(--da-teal); }
+.kpi-val.red { color: var(--da-red); }
+.kpi-label { font-size: 12px; color: var(--da-text-2); margin-top: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Section */
+.arch-section { margin-bottom: 40px; }
+.arch-section-title { font-family: var(--da-font-display); font-size: 22px; font-weight: 700; color: var(--da-text); margin-bottom: 4px; }
+.arch-section-sub { font-size: 14px; color: var(--da-text-2); margin-bottom: 20px; }
+
+/* Pipeline Flow */
+.pipeline-flow { display: flex; gap: 0; align-items: stretch; overflow-x: auto; padding-bottom: 12px; }
+.pipeline-stage { flex: 1; min-width: 160px; position: relative; }
+.pipeline-card { background: var(--da-surface); border: 1px solid var(--da-border); border-radius: var(--da-radius-lg); padding: 20px 16px; text-align: center; height: 100%; display: flex; flex-direction: column; box-shadow: var(--da-shadow-sm); transition: box-shadow 0.15s, transform 0.15s; }
+.pipeline-card:hover { box-shadow: var(--da-shadow-md); transform: translateY(-2px); }
+.pipeline-stage:not(:last-child)::after { content: ''; position: absolute; right: -12px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-left: 10px solid var(--da-blue); z-index: 1; }
+.pipeline-stage:not(:last-child) { margin-right: 24px; }
+.stage-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 22px; }
+.stage-icon.blue { background: var(--da-blue-light); color: var(--da-blue); }
+.stage-icon.green { background: #f0fdf4; color: var(--da-green); }
+.stage-icon.purple { background: #f5f3ff; color: var(--da-purple); }
+.stage-icon.amber { background: #fffbeb; color: var(--da-amber); }
+.stage-icon.teal { background: #f0fdfa; color: var(--da-teal); }
+.stage-icon.red { background: #fef2f2; color: var(--da-red); }
+.stage-name { font-weight: 700; font-size: 14px; color: var(--da-text); margin-bottom: 6px; }
+.stage-desc { font-size: 12px; color: var(--da-text-2); line-height: 1.5; flex: 1; }
+.stage-tech { margin-top: 10px; font-family: var(--da-font-mono); font-size: 10px; color: var(--da-text-3); background: var(--da-bg-2); padding: 4px 8px; border-radius: 4px; }
+
+/* Feature Grid */
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.feature-card { background: var(--da-surface); border: 1px solid var(--da-border); border-radius: var(--da-radius-lg); padding: 24px; box-shadow: var(--da-shadow-sm); transition: box-shadow 0.15s, transform 0.15s; }
+.feature-card:hover { box-shadow: var(--da-shadow-md); transform: translateY(-2px); }
+.feature-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; margin-bottom: 12px; }
+.feature-name { font-weight: 700; font-size: 15px; color: var(--da-text); margin-bottom: 6px; }
+.feature-desc { font-size: 13px; color: var(--da-text-2); line-height: 1.6; }
+.feature-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.feature-pill { font-family: var(--da-font-mono); font-size: 10px; padding: 3px 8px; border-radius: 4px; background: var(--da-bg-2); color: var(--da-text-2); border: 1px solid var(--da-border); }
+
+/* AI capabilities callout */
+.ai-callout { background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%); border: 1px solid #dbeafe; border-radius: var(--da-radius-lg); padding: 28px; margin-bottom: 40px; }
+.ai-callout-title { font-family: var(--da-font-display); font-size: 18px; font-weight: 700; color: var(--da-text); margin-bottom: 12px; }
+.ai-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.ai-item { display: flex; gap: 12px; align-items: flex-start; }
+.ai-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+.ai-dot.claude { background: var(--da-blue); }
+.ai-dot.voyage { background: var(--da-purple); }
+.ai-label { font-size: 13px; color: var(--da-text-2); line-height: 1.5; }
+.ai-label strong { color: var(--da-text); font-weight: 600; }
+
+/* Stack row */
+.stack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.stack-card { background: var(--da-surface); border: 1px solid var(--da-border); border-radius: var(--da-radius); padding: 16px; text-align: center; box-shadow: var(--da-shadow-sm); }
+.stack-card-label { font-family: var(--da-font-mono); font-size: 11px; color: var(--da-text-3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.stack-card-val { font-weight: 700; font-size: 14px; color: var(--da-text); }
+
+/* Entity type badges */
+.entity-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.entity-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; background: var(--da-bg-2); border: 1px solid var(--da-border); }
+.entity-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+/* Footer */
+.arch-footer { text-align: center; padding-top: 40px; border-top: 1px solid var(--da-border); color: var(--da-text-3); font-size: 13px; }
+.arch-footer a { color: var(--da-blue); text-decoration: none; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .pipeline-flow { flex-direction: column; }
+  .pipeline-stage:not(:last-child)::after { display: none; }
+  .pipeline-stage:not(:last-child) { margin-right: 0; margin-bottom: 12px; }
+  .kpi-card { min-width: 120px; }
+  .arch-hero h1 { font-size: 28px; }
+}
+</style>
+</head>
+<body>
+
+<div class="arch-container">
+
+  <!-- ═══════ Hero ═══════ -->
+  <div class="arch-hero">
+    <h1>DataArch<span class="accent">.AI</span></h1>
+    <div class="tagline">AI Data Operating System for Private Equity</div>
+    <div class="version-pill">v0.8.0 &middot; Foundation</div>
+  </div>
+
+  <!-- ═══════ KPI Strip ═══════ -->
+  <div class="kpi-strip">
+    <div class="kpi-card">
+      <div class="kpi-val blue">6</div>
+      <div class="kpi-label">Pipeline Stages</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val green">9</div>
+      <div class="kpi-label">Entity Types</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val purple">58</div>
+      <div class="kpi-label">API Endpoints</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val amber">5</div>
+      <div class="kpi-label">AI Models Used</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val teal">6</div>
+      <div class="kpi-label">Doc Formats</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val red">3</div>
+      <div class="kpi-label">RBAC Roles</div>
+    </div>
+  </div>
+
+  <!-- ═══════ Core Pipeline ═══════ -->
+  <div class="arch-section">
+    <div class="arch-section-title">Core Pipeline</div>
+    <div class="arch-section-sub">End-to-end document processing in one click &mdash; from raw files to queryable intelligence</div>
+
+    <div class="pipeline-flow">
+      <div class="pipeline-stage">
+        <div class="pipeline-card">
+          <div class="stage-icon blue">📄</div>
+          <div class="stage-name">1. Ingest</div>
+          <div class="stage-desc">Parse PDF, Excel, Word, CSV, and email files. Extract raw text with format-specific parsers.</div>
+          <div class="stage-tech">PyMuPDF &middot; openpyxl &middot; python-docx</div>
+        </div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="pipeline-card">
+          <div class="stage-icon purple">🧠</div>
+          <div class="stage-name">2. AI Extraction</div>
+          <div class="stage-desc">Claude reads every document and extracts structured entities, attributes, and relationships using tool_use.</div>
+          <div class="stage-tech">Claude Sonnet 4.5 &middot; tool_use</div>
+        </div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="pipeline-card">
+          <div class="stage-icon green">🏷️</div>
+          <div class="stage-name">3. Ontology Map</div>
+          <div class="stage-desc">Each entity is classified into the PE ontology: vendor, customer, employee, product, and more. Names are normalized.</div>
+          <div class="stage-tech">Claude + Pydantic validation</div>
+        </div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="pipeline-card">
+          <div class="stage-icon amber">🗄️</div>
+          <div class="stage-name">4. Schema Gen</div>
+          <div class="stage-desc">Auto-generate a normalized PostgreSQL schema with FK relationships, indexes, and multi-tenant isolation.</div>
+          <div class="stage-tech">Type inference &middot; topo sort</div>
+        </div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="pipeline-card">
+          <div class="stage-icon teal">💾</div>
+          <div class="stage-name">5. DB Load</div>
+          <div class="stage-desc">UPSERT entities into PostgreSQL. Type-aware value transformation for currency, dates, and booleans.</div>
+          <div class="stage-tech">SQLAlchemy &middot; ON CONFLICT</div>
+        </div>
+      </div>
+      <div class="pipeline-stage">
+        <div class="pipeline-card">
+          <div class="stage-icon red">🔍</div>
+          <div class="stage-name">6. Embed</div>
+          <div class="stage-desc">Generate vector embeddings for every entity. Stored in PostgreSQL via pgvector for semantic search.</div>
+          <div class="stage-tech">Voyage AI &middot; pgvector</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ AI Capabilities ═══════ -->
+  <div class="ai-callout">
+    <div class="ai-callout-title">🤖 AI Capabilities — Claude + Voyage AI</div>
+    <div class="ai-grid">
+      <div class="ai-item">
+        <div class="ai-dot claude"></div>
+        <div class="ai-label"><strong>Document Extraction</strong> — Claude reads unstructured documents and extracts entities, amounts, dates, and attributes using structured tool_use</div>
+      </div>
+      <div class="ai-item">
+        <div class="ai-dot claude"></div>
+        <div class="ai-label"><strong>Entity Classification</strong> — Each entity is mapped to the PE ontology (vendor, customer, etc.) with confidence scores and normalized names</div>
+      </div>
+      <div class="ai-item">
+        <div class="ai-dot claude"></div>
+        <div class="ai-label"><strong>SQL Analytics Agent</strong> — Ask business questions in plain English. Claude generates SQL, executes it read-only, and synthesizes a natural language answer</div>
+      </div>
+      <div class="ai-item">
+        <div class="ai-dot voyage"></div>
+        <div class="ai-label"><strong>Semantic Search</strong> — Voyage AI generates 1024-dim embeddings for every entity. Search across the portfolio with natural language queries via pgvector cosine similarity</div>
+      </div>
+      <div class="ai-item">
+        <div class="ai-dot claude"></div>
+        <div class="ai-label"><strong>Document-Type Detection</strong> — Auto-detects invoices, contracts, financial statements, and HR documents for specialized extraction prompts</div>
+      </div>
+      <div class="ai-item">
+        <div class="ai-dot claude"></div>
+        <div class="ai-label"><strong>Answer Synthesis</strong> — After SQL results are returned, Claude generates clear, executive-friendly answers from raw data tables</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ PE Ontology ═══════ -->
+  <div class="arch-section">
+    <div class="arch-section-title">PE Business Ontology</div>
+    <div class="arch-section-sub">9 entity types with configurable attributes, FK relationships, and classification rules — fully customizable from the admin API</div>
+
+    <div class="entity-row">
+      <div class="entity-badge"><div class="entity-dot" style="background:#4A90D9;"></div>Vendor</div>
+      <div class="entity-badge"><div class="entity-dot" style="background:#50C878;"></div>Customer</div>
+      <div class="entity-badge"><div class="entity-dot" style="background:#F5A623;"></div>Employee</div>
+      <div class="entity-badge"><div class="entity-dot" style="background:#9B59B6;"></div>Product</div>
+      <div class="entity-badge"><div class="entity-dot" style="background:#E74C3C;"></div>Transaction</div>
+      <div class="entity-badge"><div class="entity-dot" style="background:#1ABC9C;"></div>Contract</div>
+      <div class="entity-badge"><div class="entity-dot" style="background:#F39C12;"></div>Financial Record</div>
+      <div class="entity-badge"><div class="entity-dot" style="background:#3498DB;"></div>Business Unit</div>
+      <div class="entity-badge"><div class="entity-dot" style="background:#95A5A6;"></div>Unknown</div>
+    </div>
+
+    <div class="feature-grid" style="margin-top: 20px;">
+      <div class="feature-card">
+        <div class="feature-name">36 Default Attributes</div>
+        <div class="feature-desc">Pre-configured attributes across 8 entity types — contact info, financial terms, dates, addresses, payment terms, and more. Each with SQL type hints.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-name">7 FK Relationships</div>
+        <div class="feature-desc">Transaction→Vendor, Transaction→Customer, Transaction→Product, Contract→Vendor, Contract→Customer, Employee→Business Unit, Product→Vendor.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-name">DB-Backed + Cacheable</div>
+        <div class="feature-desc">Ontology stored in PostgreSQL, loaded via a central service with 5-minute TTL cache. Graceful fallback to hardcoded defaults if DB unavailable.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ Product Features ═══════ -->
+  <div class="arch-section">
+    <div class="arch-section-title">Product Features</div>
+    <div class="arch-section-sub">What users can do with DataArch.AI today</div>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon stage-icon blue">📤</div>
+        <div class="feature-name">Multi-Format Document Ingestion</div>
+        <div class="feature-desc">Drag-and-drop upload for PDF, Excel (.xlsx/.xlsm), Word (.docx), CSV, and email (.eml). Files are parsed, entities extracted via Claude, and results stored for the full pipeline.</div>
+        <div class="feature-pills">
+          <span class="feature-pill">PDF</span>
+          <span class="feature-pill">XLSX</span>
+          <span class="feature-pill">DOCX</span>
+          <span class="feature-pill">CSV</span>
+          <span class="feature-pill">EML</span>
+          <span class="feature-pill">25MB limit</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon stage-icon green">🔄</div>
+        <div class="feature-name">One-Click Pipeline</div>
+        <div class="feature-desc">Upload a document and run the entire 6-stage pipeline as a single background job. Track progress in real-time with per-step status, timing, and error details.</div>
+        <div class="feature-pills">
+          <span class="feature-pill">Async Jobs</span>
+          <span class="feature-pill">Status Polling</span>
+          <span class="feature-pill">Per-Step Tracking</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon stage-icon purple">🏷️</div>
+        <div class="feature-name">Entity Classification</div>
+        <div class="feature-desc">Every extracted entity is classified into the PE ontology with confidence scores. Browse the full entity registry with type badges, source files, and attributes.</div>
+        <div class="feature-pills">
+          <span class="feature-pill">9 Types</span>
+          <span class="feature-pill">Confidence Scores</span>
+          <span class="feature-pill">Canonical Names</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon stage-icon amber">📊</div>
+        <div class="feature-name">Auto-Generated Schema</div>
+        <div class="feature-desc">Automatically produce a normalized PostgreSQL schema from your entity data. View as interactive tables or download raw SQL DDL. Foreign keys, indexes, and type inference included.</div>
+        <div class="feature-pills">
+          <span class="feature-pill">DDL Export</span>
+          <span class="feature-pill">FK Discovery</span>
+          <span class="feature-pill">Type Inference</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon stage-icon teal">🕸️</div>
+        <div class="feature-name">Interactive Data Flow Map</div>
+        <div class="feature-desc">D3.js force-directed graph visualization showing how entity types relate to each other. Click nodes to expand individual entities, see relationship edges, and explore the data topology.</div>
+        <div class="feature-pills">
+          <span class="feature-pill">D3.js v7</span>
+          <span class="feature-pill">Force Graph</span>
+          <span class="feature-pill">Interactive</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon stage-icon red">🤖</div>
+        <div class="feature-name">AI Analytics (Ask Anything)</div>
+        <div class="feature-desc">Ask business questions in plain English — "Who are our top vendors by spend?" Claude generates SQL, runs it read-only against your data, and explains the answer.</div>
+        <div class="feature-pills">
+          <span class="feature-pill">NL → SQL</span>
+          <span class="feature-pill">Read-Only</span>
+          <span class="feature-pill">10s Timeout</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon stage-icon blue">🔍</div>
+        <div class="feature-name">Semantic Search</div>
+        <div class="feature-desc">Search across all entity data with natural language queries. Voyage AI embeddings + pgvector cosine similarity returns the most relevant entities ranked by score.</div>
+        <div class="feature-pills">
+          <span class="feature-pill">1024-dim Vectors</span>
+          <span class="feature-pill">pgvector</span>
+          <span class="feature-pill">Top-K</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon stage-icon green">🏢</div>
+        <div class="feature-name">Multi-Company Portfolio</div>
+        <div class="feature-desc">Create portfolio companies, upload documents per company, and isolate entity data with company_id scoping. Cross-company analytics like vendor overlap are built in.</div>
+        <div class="feature-pills">
+          <span class="feature-pill">Tenant Isolation</span>
+          <span class="feature-pill">Vendor Overlap</span>
+          <span class="feature-pill">Company CRUD</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon stage-icon purple">🔗</div>
+        <div class="feature-name">Entity Resolution</div>
+        <div class="feature-desc">Find near-duplicate entities using embedding cosine similarity. Human-in-the-loop merge with full audit trail and undo capability. Works across companies.</div>
+        <div class="feature-pills">
+          <span class="feature-pill">Fuzzy Dedup</span>
+          <span class="feature-pill">Merge + Undo</span>
+          <span class="feature-pill">Audit Trail</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon stage-icon amber">⚙️</div>
+        <div class="feature-name">Customizable Ontology</div>
+        <div class="feature-desc">Full admin API to create, update, and archive entity types. Add custom FK rules and per-type attributes. Changes propagate to all 8+ pipeline modules via cache invalidation.</div>
+        <div class="feature-pills">
+          <span class="feature-pill">Admin CRUD</span>
+          <span class="feature-pill">5-min Cache</span>
+          <span class="feature-pill">Hot Reload</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon stage-icon teal">🔐</div>
+        <div class="feature-name">Authentication & RBAC</div>
+        <div class="feature-desc">JWT-based authentication with three roles: PE Admin, Company Admin, Company Viewer. API key support with SHA-256 hashing. Audit logging on all sensitive actions.</div>
+        <div class="feature-pills">
+          <span class="feature-pill">JWT + bcrypt</span>
+          <span class="feature-pill">3 Roles</span>
+          <span class="feature-pill">Audit Log</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon stage-icon red">🛡️</div>
+        <div class="feature-name">Security Hardening</div>
+        <div class="feature-desc">25MB upload limits with magic byte content-type validation. Database reset requires admin + confirmation. Read-only SQL execution with keyword blocklist and 10s timeout.</div>
+        <div class="feature-pills">
+          <span class="feature-pill">Magic Bytes</span>
+          <span class="feature-pill">SQL Guardrails</span>
+          <span class="feature-pill">CORS</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ Tech Stack ═══════ -->
+  <div class="arch-section">
+    <div class="arch-section-title">Technology Stack</div>
+    <div class="arch-section-sub">Production-grade infrastructure, zero build step on the frontend</div>
+
+    <div class="stack-grid">
+      <div class="stack-card">
+        <div class="stack-card-label">Backend</div>
+        <div class="stack-card-val">FastAPI + Uvicorn</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-label">Language</div>
+        <div class="stack-card-val">Python 3.11+</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-label">Database</div>
+        <div class="stack-card-val">PostgreSQL 16</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-label">Vectors</div>
+        <div class="stack-card-val">pgvector</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-label">ORM</div>
+        <div class="stack-card-val">SQLAlchemy 2.0</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-label">Migrations</div>
+        <div class="stack-card-val">Alembic</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-label">LLM</div>
+        <div class="stack-card-val">Claude Sonnet 4.5</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-label">Embeddings</div>
+        <div class="stack-card-val">Voyage AI (voyage-3)</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-label">Frontend</div>
+        <div class="stack-card-val">Vanilla JS + D3.js</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-label">Auth</div>
+        <div class="stack-card-val">JWT + bcrypt</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-label">Container</div>
+        <div class="stack-card-val">Docker Compose</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-label">Validation</div>
+        <div class="stack-card-val">Pydantic v2</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ Architecture Layers ═══════ -->
+  <div class="arch-section">
+    <div class="arch-section-title">Architecture Layers</div>
+    <div class="arch-section-sub">How the system is organized — from user interface to data storage</div>
+
+    <div class="feature-grid">
+      <div class="feature-card" style="border-left: 4px solid var(--da-blue);">
+        <div class="feature-name">🖥️ Presentation Layer</div>
+        <div class="feature-desc">
+          Vanilla HTML/CSS/JS with a custom design system ("Crisp Precision White"). Six pages: Ingestion, Ontology Registry, Schema Builder, Data Flow (D3.js), AI Analytics, and Portfolio Intelligence. Zero build step — just serve static files.
+        </div>
+      </div>
+
+      <div class="feature-card" style="border-left: 4px solid var(--da-green);">
+        <div class="feature-name">🌐 API Layer (58 endpoints)</div>
+        <div class="feature-desc">
+          FastAPI with 10 modular route files: auth (7), ingest (6), ontology (4), schema (3), dataflow (2), database (6), AI (3), portfolio (7), entities (4), admin (9). CORS middleware, auth dependencies, and request validation.
+        </div>
+      </div>
+
+      <div class="feature-card" style="border-left: 4px solid var(--da-purple);">
+        <div class="feature-name">⚙️ Service Layer</div>
+        <div class="feature-desc">
+          Central ontology service with 5-min TTL cache, providing dynamic config to all pipeline modules. Audit logging service for non-blocking write-behind logging. Auth service with JWT token management and RBAC enforcement.
+        </div>
+      </div>
+
+      <div class="feature-card" style="border-left: 4px solid var(--da-amber);">
+        <div class="feature-name">🔧 Pipeline Layer (6 stages)</div>
+        <div class="feature-desc">
+          Modular pipeline: parsers → LLM extraction → ontology classification → schema generation → DB creation → embedding. Background job runner with per-step status tracking. Smart chunking for long documents.
+        </div>
+      </div>
+
+      <div class="feature-card" style="border-left: 4px solid var(--da-teal);">
+        <div class="feature-name">💾 Data Layer</div>
+        <div class="feature-desc">
+          PostgreSQL 16 with pgvector. SQLAlchemy 2.0 connection pooling with pre-ping health checks. Dynamic entity tables per ontology type, plus system tables for users, API keys, audit logs, and pipeline jobs. Alembic for migrations.
+        </div>
+      </div>
+
+      <div class="feature-card" style="border-left: 4px solid var(--da-red);">
+        <div class="feature-name">🏗️ Infrastructure Layer</div>
+        <div class="feature-desc">
+          Docker Compose with health checks on both API and database. Container entrypoint runs migrations → seed → serve. Environment-based configuration via .env files. One-command startup with start.sh.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ What Makes It Different ═══════ -->
+  <div class="arch-section">
+    <div class="arch-section-title">Competitive Moat</div>
+    <div class="arch-section-sub">Why DataArch.AI wins in the PE data management space</div>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-name">🎯 PE-Native Ontology</div>
+        <div class="feature-desc">Purpose-built for private equity — not a generic data tool. The ontology understands vendors, portfolio companies, transactions, and fund structures out of the box.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-name">📄 Any Document → Structured Data</div>
+        <div class="feature-desc">Upload an invoice PDF, a vendor contract, or an employee roster in Excel — Claude extracts structured entities automatically. No templates, no configuration required.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-name">🗄️ Auto-Generated Database</div>
+        <div class="feature-desc">The schema adapts to your data. Upload documents → get a fully normalized, FK-linked, indexed PostgreSQL database — without writing a single CREATE TABLE.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-name">💬 Ask Questions, Get Answers</div>
+        <div class="feature-desc">No SQL knowledge needed. Ask "Which vendors serve multiple portfolio companies?" and get a plain English answer backed by real data. Full transparency with generated SQL shown.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-name">🏢 Multi-Tenant from Day One</div>
+        <div class="feature-desc">Designed for PE firms managing multiple portfolio companies. Data isolation via company_id, cross-portfolio analytics, and role-based access control built into every layer.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-name">🔧 Fully Customizable</div>
+        <div class="feature-desc">Add new entity types, define custom FK rules, and configure attributes — all through the admin API. Changes propagate through the entire pipeline without code changes or redeployment.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ Footer ═══════ -->
+  <div class="arch-footer">
+    DataArch.AI v0.8.0 &middot; Built with Claude &middot; <a href="/">Back to App</a>
+  </div>
+
+</div>
+
+</body>
+</html>

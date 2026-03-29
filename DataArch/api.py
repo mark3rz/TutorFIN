@@ -126,3 +126,12 @@ def dataflow_view():
     if path.exists():
         return HTMLResponse(content=path.read_text())
     return HTMLResponse(content="<h1>DataArch.AI</h1><p>Data flow visualization not found.</p>")
+
+
+@app.get("/architecture", response_class=HTMLResponse)
+def architecture_view():
+    """Serve the system architecture map."""
+    path = FRONTEND_DIR / "architecture.html"
+    if path.exists():
+        return HTMLResponse(content=path.read_text())
+    return HTMLResponse(content="<h1>DataArch.AI</h1><p>Architecture page not found.</p>")

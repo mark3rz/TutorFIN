@@ -9,8 +9,8 @@
 </head>
 <body>
 
-<!-- ══════════ Login Screen ══════════ -->
-<div class="da-login-screen" id="login-screen">
+<!-- ══════════ Login Screen (temporarily disabled) ══════════ -->
+<div class="da-login-screen" id="login-screen" style="display:none;">
   <div class="da-login-bg" style="background-image: url('/static/photos/christian-ladewig-TTPMpLl_2lc-unsplash.jpg');"></div>
   <div class="da-login-card">
     <div class="da-login-logo">DataArch<span class="accent">.AI</span></div>
@@ -56,7 +56,7 @@
   </div>
 </div>
 
-<div class="da-app" id="app-shell" style="display:none;">
+<div class="da-app" id="app-shell">
 
   <!-- ══════════ Sidebar Navigation ══════════ -->
   <aside class="da-sidebar da-grain">
@@ -458,12 +458,14 @@ function enterApp() {
 }
 
 // Check for existing session on page load
+// AUTH TEMPORARILY DISABLED — skip login screen, go straight to app
 (function initAuth() {
+  enterApp();
+  /*
   const savedUser = localStorage.getItem("da_user");
   if (authToken && savedUser) {
     try {
       currentUser = JSON.parse(savedUser);
-      // Verify token is still valid
       _originalFetch(`${API}/auth/me`, {
         headers: { "Authorization": `Bearer ${authToken}` },
       }).then(res => {
@@ -473,7 +475,6 @@ function enterApp() {
           doLogout();
         }
       }).catch(() => {
-        // Server not reachable — still show app (will fail gracefully)
         enterApp();
       });
     } catch {
@@ -482,6 +483,7 @@ function enterApp() {
   } else {
     document.getElementById("login-screen").style.display = "flex";
   }
+  */
 })();
 
 // ── Sidebar navigation ──────────────────────────────────────────────────────
