@@ -13,7 +13,6 @@ Phase 1 improvements:
   - Document-type-specific extraction prompts
 """
 
-import os
 import json
 import time
 import logging
@@ -21,16 +20,16 @@ from typing import Any
 
 import anthropic
 from pydantic import BaseModel, Field, ValidationError
-from dotenv import load_dotenv
 
-load_dotenv()
+import config
+from pipeline.client import get_anthropic_client
 
 logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
-# Model can be overridden via environment variable
-MODEL = os.getenv("DATAARCH_MODEL", "claude-sonnet-4-5-20250929")
+# Model sourced from config.py (reads DATAARCH_MODEL env var)
+MODEL = config.DATAARCH_MODEL
 
 # Chunking settings
 CHUNK_SIZE = 8000        # characters per chunk
@@ -38,19 +37,9 @@ CHUNK_OVERLAP = 500      # overlap between chunks
 MAX_RETRIES = 3          # retry attempts for LLM calls
 RETRY_BASE_DELAY = 1.0   # base delay in seconds (exponential backoff)
 
-_client: anthropic.Anthropic | None = None
-
-
 def _get_client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise EnvironmentError(
-                "ANTHROPIC_API_KEY not set. Copy .env.example to .env and add your key."
-            )
-        _client = anthropic.Anthropic(api_key=api_key)
-    return _client
+    """Thin wrapper — delegates to the shared client factory in pipeline/client.py."""
+    return get_anthropic_client()
 
 
 # ── Pydantic models for LLM response validation ─────────────────────────────

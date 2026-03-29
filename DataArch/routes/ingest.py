@@ -220,3 +220,99 @@ def pipeline_jobs(user: Optional[TokenUser] = Depends(get_optional_user)):
     from pipeline.pipeline_runner import list_jobs
 
     return JSONResponse(content={"jobs": list_jobs()})
+
+
+# ── Excel pre-analysis ──────────────────────────────────────────────────────
+
+@router.post("/ingest/excel/analyze")
+async def analyze_excel(
+    request: Request,
+    file: UploadFile = File(...),
+    user: Optional[TokenUser] = Depends(get_optional_user),
+):
+    """
+    Analyse an Excel file's structure WITHOUT running the full pipeline.
+
+    Returns sheet classifications, detected headers, column types, and
+    whether each sheet is suitable for structured (row-by-row) extraction.
+
+    The frontend uses this to show a sheet preview + mapping UI before
+    the user confirms and triggers the full pipeline run.
+
+    Request: multipart/form-data with a .xlsx or .xlsm file.
+
+    Response:
+    {
+        "filename": "vendors.xlsx",
+        "sheet_count": 3,
+        "structured_sheet_count": 2,
+        "sheets": [
+            {
+                "name": "Vendors",
+                "classification": "vendor_list",
+                "header_row_index": 1,
+                "total_rows": 45,
+                "data_rows": 43,
+                "total_cols": 7,
+                "columns": [
+                    {"index": 0, "letter": "A", "header": "Vendor Name",
+                     "col_type": "text", "non_empty_rows": 43, "sample_values": [...]}
+                ],
+                "has_merged_cells": false,
+                "is_structured": true,
+                "skip_reason": "",
+                "formula_columns": ["G"]
+            }
+        ]
+    }
+    """
+    from pipeline.parsers.excel_intelligence import analyse_workbook, workbook_analysis_to_dict
+
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in (".xlsx", ".xlsm"):
+        raise HTTPException(
+            status_code=415,
+            detail=f"Excel analysis only supports .xlsx and .xlsm files. Got: '{suffix}'",
+        )
+
+    content = await file.read()
+
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large ({len(content) / 1024 / 1024:.1f} MB). Maximum: {MAX_UPLOAD_SIZE / 1024 / 1024:.0f} MB.",
+        )
+
+    # Validate magic bytes (Office Open XML = ZIP)
+    if content[:4] != b"PK\x03\x04":
+        raise HTTPException(
+            status_code=415,
+            detail="File content does not match expected Excel format.",
+        )
+
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(content)
+        tmp_path = Path(tmp.name)
+
+    named_path = tmp_path.parent / file.filename
+    tmp_path.rename(named_path)
+
+    try:
+        analysis = analyse_workbook(named_path)
+        result = workbook_analysis_to_dict(analysis)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Excel analysis failed: {e}")
+    finally:
+        if named_path.exists():
+            named_path.unlink()
+
+    log_action(
+        user_id=user.id if user else None,
+        action="excel_analyze",
+        resource_type="document",
+        resource_id=file.filename,
+        details={"size_bytes": len(content), "sheet_count": result.get("sheet_count")},
+        ip_address=get_client_ip(request),
+    )
+
+    return JSONResponse(content=result)

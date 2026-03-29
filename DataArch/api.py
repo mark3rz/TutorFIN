@@ -21,12 +21,20 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 import config
+
+# ── Rate Limiter ───────────────────────────────────────────────────────────
+# Key function uses remote IP. In production behind a proxy, swap
+# get_remote_address for a function that reads the X-Forwarded-For header.
+limiter = Limiter(key_func=get_remote_address)
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +66,10 @@ app = FastAPI(
     version=config.APP_VERSION,
     lifespan=lifespan,
 )
+
+# Attach limiter to app state so slowapi decorators can find it
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ── CORS Middleware ────────────────────────────────────────────────────────
 

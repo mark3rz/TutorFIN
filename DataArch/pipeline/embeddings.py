@@ -91,6 +91,7 @@ def _get_voyage_client():
 def generate_embeddings(
     texts: list[str],
     model: str | None = None,
+    input_type: str = "document",
 ) -> list[list[float]]:
     """
     Generate vector embeddings for a list of texts using Voyage AI.
@@ -98,6 +99,9 @@ def generate_embeddings(
     Args:
         texts: List of text strings to embed
         model: Embedding model name (defaults to config.EMBEDDING_MODEL)
+        input_type: Voyage AI input type — "document" when indexing entity data,
+                    "query" when embedding a search query. Using the correct type
+                    is critical for retrieval quality.
 
     Returns:
         List of embedding vectors (each is a list of floats)
@@ -111,12 +115,12 @@ def generate_embeddings(
 
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]
-        logger.info(f"Embedding batch {i // batch_size + 1} ({len(batch)} texts)")
+        logger.info(f"Embedding batch {i // batch_size + 1} ({len(batch)} texts, input_type={input_type})")
 
         result = client.embed(
             texts=batch,
             model=model,
-            input_type="document",
+            input_type=input_type,
         )
         all_embeddings.extend(result.embeddings)
 

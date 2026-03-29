@@ -8,12 +8,9 @@ output to outputs/ontology/.
 
 import hashlib
 import json
-import os
 from pathlib import Path
 
-import anthropic
-from dotenv import load_dotenv
-
+from pipeline.client import get_anthropic_client
 from pipeline.schema import ParsedDocument
 from pipeline.ontology.schema import (
     OntologyRecord,
@@ -26,17 +23,8 @@ from pipeline.ontology.classifier import (
     ontology_type_from_str,
 )
 
-load_dotenv()
-
 ONTOLOGY_OUTPUT_DIR = Path("outputs/ontology")
 REGISTRY_PATH = ONTOLOGY_OUTPUT_DIR / "entity_registry.json"
-
-
-def _get_client() -> anthropic.Anthropic:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise EnvironmentError("ANTHROPIC_API_KEY not set.")
-    return anthropic.Anthropic(api_key=api_key)
 
 
 def _make_id(
@@ -83,7 +71,7 @@ def map_document(
     """
     ONTOLOGY_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    client = _get_client()
+    client = get_anthropic_client()
     registry = _load_registry()
 
     records: list[OntologyRecord] = []

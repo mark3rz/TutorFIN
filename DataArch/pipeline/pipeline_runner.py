@@ -11,7 +11,15 @@ Runs the full data pipeline as an async background job:
 
 Each job gets a unique ID and can be polled for status via GET /pipeline/status/{job_id}.
 
-Phase 4, Step 4.1
+Persistence (v0.9.2)
+  - Job state is written to the pipeline_jobs PostgreSQL table (via
+    services/job_store.py) on every significant state change.
+  - The in-memory _jobs dict is kept as a fast read-through cache.
+  - On a cache miss (e.g. after a server restart) get_job() falls back to the DB.
+  - DB failures are non-fatal: the pipeline continues and the in-memory cache
+    remains the fallback so the API stays functional.
+
+Phase 4, Step 4.1 / v0.9.2
 """
 
 from __future__ import annotations
@@ -109,27 +117,99 @@ class PipelineJob:
         }
 
 
-# ── Job Store (in-memory) ────────────────────────────────────────────────────
+# ── Job Store — in-memory cache + DB write-through ───────────────────────────
 
 _jobs: dict[str, PipelineJob] = {}
 _lock = threading.Lock()
 
 
 def get_job(job_id: str) -> PipelineJob | None:
-    """Retrieve a job by ID."""
+    """
+    Retrieve a job by ID.
+
+    Cache-first: returns the in-memory PipelineJob if present (active or
+    recently completed jobs).  Falls back to the DB for jobs created in a
+    previous server process (post-restart recovery).  The DB row is
+    reconstructed into a PipelineJob and cached so subsequent polls are fast.
+    """
     with _lock:
-        return _jobs.get(job_id)
+        if job_id in _jobs:
+            return _jobs[job_id]
+
+    # Cache miss — try the persistent store
+    from services.job_store import load_job
+    row = load_job(job_id)
+    if row is None:
+        return None
+
+    # Reconstruct a PipelineJob from the DB row so callers get a consistent type
+    job = _job_from_dict(row)
+    with _lock:
+        _jobs[job_id] = job  # warm the cache
+    return job
 
 
 def list_jobs(limit: int = 20) -> list[dict]:
-    """List recent jobs, newest first."""
+    """
+    List recent jobs, newest first.
+
+    Merges the in-memory cache (which has live step-by-step progress for
+    running jobs) with DB rows (for jobs from previous server processes).
+    DB rows take precedence for completed/failed jobs; in-memory wins for
+    running/queued jobs (fresher step data).
+    """
+    from services.job_store import load_recent_jobs
+
+    db_jobs: dict[str, dict] = {j["job_id"]: j for j in load_recent_jobs(limit)}
+
     with _lock:
-        sorted_jobs = sorted(
-            _jobs.values(),
-            key=lambda j: j.created_at,
-            reverse=True,
-        )
-        return [j.to_dict() for j in sorted_jobs[:limit]]
+        mem_jobs: dict[str, dict] = {jid: j.to_dict() for jid, j in _jobs.items()}
+
+    # Merge: in-memory wins for jobs that exist in both (live progress data)
+    merged: dict[str, dict] = {**db_jobs, **mem_jobs}
+
+    # Sort by created_at descending, return top `limit`
+    sorted_jobs = sorted(
+        merged.values(),
+        key=lambda j: j.get("created_at") or "",
+        reverse=True,
+    )
+    return sorted_jobs[:limit]
+
+
+# ── Job Reconstruction (from DB rows) ────────────────────────────────────────
+
+def _job_from_dict(d: dict) -> PipelineJob:
+    """
+    Reconstruct a PipelineJob from a serialised dict (e.g. loaded from the DB).
+    Step results are rebuilt from the stored steps_json if present.
+    """
+    job = PipelineJob(
+        job_id=d["job_id"],
+        filename=d["filename"],
+        status=d.get("status", "unknown"),
+        created_at=d.get("created_at") or datetime.now(timezone.utc).isoformat(),
+        started_at=d.get("started_at"),
+        completed_at=d.get("completed_at"),
+        duration_ms=d.get("duration_ms"),
+        error=d.get("error"),
+        document_id=d.get("document_id"),
+        company_id=d.get("company_id"),
+        company_slug=d.get("company_slug"),
+    )
+    # Restore per-step results if available
+    steps_data = d.get("steps") or {}
+    if steps_data:
+        for step_name, step_dict in steps_data.items():
+            if step_name in job.steps:
+                s = job.steps[step_name]
+                s.status = step_dict.get("status", "pending")
+                s.started_at = step_dict.get("started_at")
+                s.completed_at = step_dict.get("completed_at")
+                s.duration_ms = step_dict.get("duration_ms")
+                s.detail = step_dict.get("detail")
+                s.error = step_dict.get("error")
+    return job
 
 
 # ── Step Execution Helpers ───────────────────────────────────────────────────
@@ -217,6 +297,10 @@ def run_pipeline(
     with _lock:
         _jobs[job_id] = job
 
+    # Persist to DB immediately so the job is visible even if the process restarts
+    from services.job_store import persist_job_created
+    persist_job_created(job_id=job_id, filename=filename, company_id=company_id)
+
     thread = threading.Thread(
         target=_execute_pipeline,
         args=(job, file_path, skip_embed),
@@ -227,6 +311,22 @@ def run_pipeline(
     logger.info(f"Pipeline job '{job_id}' queued for '{filename}'"
                 f"{f' (company_id={company_id})' if company_id else ''}.")
     return job_id
+
+
+def _steps_to_dict(job: "PipelineJob") -> dict:
+    """Serialise a job's steps to a plain dict suitable for JSON / DB storage."""
+    return {
+        name: {
+            "step": s.step,
+            "status": s.status,
+            "started_at": s.started_at,
+            "completed_at": s.completed_at,
+            "duration_ms": s.duration_ms,
+            "detail": s.detail,
+            "error": s.error,
+        }
+        for name, s in job.steps.items()
+    }
 
 
 def _resolve_company_slug(company_id: int | None) -> str | None:
@@ -245,9 +345,18 @@ def _resolve_company_slug(company_id: int | None) -> str | None:
 
 def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
     """Run all pipeline steps sequentially in a background thread."""
+    from services.job_store import (
+        persist_job_started,
+        persist_job_completed,
+        persist_step_update,
+    )
+
     job.status = "running"
     job.started_at = _now()
     t0 = time.monotonic()
+
+    # Persist running state immediately
+    persist_job_started(job.job_id, job.started_at)
 
     all_success = True
 
@@ -263,6 +372,7 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
         parsed: ParsedDocument = _run_step(
             job, "ingest", ingest, file_path
         )
+        persist_step_update(job.job_id, _steps_to_dict(job))
         doc_id = file_path.stem.replace(" ", "_")
         job.document_id = doc_id
         job.steps["ingest"].detail = {
@@ -292,6 +402,7 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
             "mapped": len(ont_result.records),
             "unmapped": ont_result.unmapped_count if hasattr(ont_result, "unmapped_count") else 0,
         }
+        persist_step_update(job.job_id, _steps_to_dict(job))
 
         # ── Step 3: Schema Generation ──────────────────────
         from pipeline.schema_generator import generate_and_save as gen_schema
@@ -300,6 +411,7 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
         job.steps["schema"].detail = {
             "table_count": len(schema.get("tables", [])),
         }
+        persist_step_update(job.job_id, _steps_to_dict(job))
 
         # ── Step 4: Database Create ─────────────────────────
         try:
@@ -315,6 +427,7 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
             job.steps["database_create"].completed_at = _now()
             all_success = False
             logger.warning(f"[{job.job_id}] database_create failed (non-fatal): {e}")
+        persist_step_update(job.job_id, _steps_to_dict(job))
 
         # ── Step 5: Data Load ───────────────────────────────
         if job.steps["database_create"].status == "success":
@@ -336,6 +449,7 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
             job.steps["data_load"].status = "skipped"
             job.steps["data_load"].detail = {"reason": "database_create failed"}
             all_success = False
+        persist_step_update(job.job_id, _steps_to_dict(job))
 
         # ── Step 6: Embeddings (optional) ───────────────────
         if skip_embed:
@@ -378,6 +492,16 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
         else:
             job.status = "failed"
 
+        # Persist final state to DB
+        persist_job_completed(
+            job_id=job.job_id,
+            status=job.status,
+            completed_at=job.completed_at,
+            duration_ms=job.duration_ms,
+            steps=_steps_to_dict(job),
+            error=job.error,
+        )
+
         logger.info(
             f"[{job.job_id}] Pipeline finished in {elapsed}ms. "
             f"Status: {job.status}"
@@ -390,3 +514,13 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
         job.status = "failed"
         job.error = str(e)
         logger.error(f"[{job.job_id}] Pipeline failed: {e}")
+
+        # Persist failure to DB even on unexpected exception
+        persist_job_completed(
+            job_id=job.job_id,
+            status="failed",
+            completed_at=job.completed_at,
+            duration_ms=job.duration_ms,
+            steps=_steps_to_dict(job),
+            error=str(e),
+        )

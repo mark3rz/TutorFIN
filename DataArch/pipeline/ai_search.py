@@ -85,10 +85,13 @@ def semantic_search(
     engine = engine or get_engine()
 
     # 1. Embed the query
+    # NOTE: input_type="query" is required for Voyage AI search queries.
+    # Using "document" (the indexing type) reduces retrieval quality.
     try:
         query_embeddings = generate_embeddings(
             [query],
             model=config.EMBEDDING_MODEL,
+            input_type="query",
         )
         query_vec = query_embeddings[0]
     except Exception as e:

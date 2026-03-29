@@ -5,34 +5,60 @@ Endpoints:
   POST /ai/embed    Generate vector embeddings for all entities
   POST /ai/search   Semantic search across entity data
   POST /ai/ask      Natural language SQL analytics
+
+v0.9.3 — Async event loop fix
+  All three endpoints are now `async def` and offload their blocking LLM /
+  Voyage AI calls to the default thread-pool executor via `_run_sync()`.
+  This ensures the FastAPI event loop is never blocked during slow network
+  I/O to Anthropic or Voyage AI (which can take 5–30 s per request).
+
+  The underlying pipeline functions remain synchronous — they are designed to
+  run in thread contexts (pipeline workers, run_in_executor).  Converting the
+  full pipeline stack to async is deferred to a future refactor.
 """
 
 from __future__ import annotations
 
+import asyncio
+import functools
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from auth import TokenUser, get_optional_user
+from api import limiter
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+async def _run_sync(fn, *args, **kwargs):
+    """
+    Run a synchronous blocking function in the default thread-pool executor
+    so it doesn't block the FastAPI event loop.
+    """
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, functools.partial(fn, *args, **kwargs))
+
+
+# ── Endpoints ────────────────────────────────────────────────────────────────
+
 @router.post("/embed")
-def ai_embed(user: Optional[TokenUser] = Depends(get_optional_user)):
+async def ai_embed(user: Optional[TokenUser] = Depends(get_optional_user)):
     """Generate vector embeddings for all entities and store in PostgreSQL."""
     from pipeline.embeddings import embed_all_entities, setup_pgvector
 
     try:
-        setup_result = setup_pgvector()
+        setup_result = await _run_sync(setup_pgvector)
         if setup_result.get("errors"):
             return JSONResponse(
                 content={"status": "pgvector_setup_failed", "setup": setup_result},
                 status_code=500,
             )
 
-        embed_result = embed_all_entities()
+        embed_result = await _run_sync(embed_all_entities)
         return JSONResponse(content={
             "status": "complete",
             "setup": setup_result,
@@ -47,7 +73,12 @@ def ai_embed(user: Optional[TokenUser] = Depends(get_optional_user)):
 
 
 @router.post("/search")
-def ai_search(body: dict, user: Optional[TokenUser] = Depends(get_optional_user)):
+@limiter.limit("60/minute")
+async def ai_search(
+    request: Request,
+    body: dict,
+    user: Optional[TokenUser] = Depends(get_optional_user),
+):
     """Semantic search across entity data using vector similarity.
 
     Request body: {"query": "which vendors have long payment terms?", "top_k": 10, "company_id": 1}
@@ -68,14 +99,22 @@ def ai_search(body: dict, user: Optional[TokenUser] = Depends(get_optional_user)
         company_id = user.company_id
 
     try:
-        result = semantic_search(
-            query, top_k=top_k, entity_type=entity_type, company_id=company_id
+        result = await _run_sync(
+            semantic_search,
+            query,
+            top_k=top_k,
+            entity_type=entity_type,
+            company_id=company_id,
         )
         return JSONResponse(content=result)
     except (EnvironmentError, ImportError):
         try:
-            result = text_search(
-                query, top_k=top_k, entity_type=entity_type, company_id=company_id
+            result = await _run_sync(
+                text_search,
+                query,
+                top_k=top_k,
+                entity_type=entity_type,
+                company_id=company_id,
             )
             result["note"] = "Vector search unavailable. Using text search fallback."
             return JSONResponse(content=result)
@@ -86,7 +125,12 @@ def ai_search(body: dict, user: Optional[TokenUser] = Depends(get_optional_user)
 
 
 @router.post("/ask")
-def ai_ask(body: dict, user: Optional[TokenUser] = Depends(get_optional_user)):
+@limiter.limit("30/minute")
+async def ai_ask(
+    request: Request,
+    body: dict,
+    user: Optional[TokenUser] = Depends(get_optional_user),
+):
     """Ask a business question in plain English.
 
     Claude generates SQL, executes it, and returns a natural language answer.
@@ -105,7 +149,8 @@ def ai_ask(body: dict, user: Optional[TokenUser] = Depends(get_optional_user)):
         company_id = user.company_id
 
     try:
-        result = ask(
+        result = await _run_sync(
+            ask,
             question,
             max_rows=body.get("max_rows", 100),
             company_id=company_id,

@@ -12,7 +12,7 @@ Output:
 
 Fixes (Phase 1.1):
   - Topological sort: parent tables created before children
-  - FK type compatibility: FK columns reference canonical_name (VARCHAR) not id (BIGSERIAL)
+  - FK type compatibility: FK columns reference id (BIGSERIAL) — the PK
   - Reserved words: table/column names are quoted when necessary
   - UNIQUE constraints on natural keys (canonical_name)
   - Indexes on FK columns and canonical_name
@@ -322,16 +322,27 @@ def generate_schema(registry: EntityRegistry) -> dict:
              "default": "NOW()"},
         ])
 
-        # Determine foreign keys for this table
-        # FK references canonical_name (VARCHAR) on the parent table, not id (BIGSERIAL)
+        # Determine foreign keys for this table.
+        # FK references id (BIGSERIAL) — the primary key on the parent table.
+        # FK columns (e.g. vendor_id) store the parent row's integer PK, not canonical_name.
         foreign_keys = []
+        fk_col_names: set[str] = set()
         for (child, col), parent in _get_fk_rules().items():
             if child == table_name and any(c["name"] == col for c in columns):
                 foreign_keys.append({
                     "column": col,
                     "references_table": parent,
-                    "references_column": "canonical_name",
+                    "references_column": "id",
                 })
+                fk_col_names.add(col)
+
+        # Coerce FK columns to BIGINT — they reference id (BIGSERIAL), so they
+        # must be integer.  infer_sql_type() may have typed them as VARCHAR if
+        # the attribute values happened to be name strings.
+        for col in columns:
+            if col["name"] in fk_col_names and col["type"] not in ("BIGINT", "BIGSERIAL", "INTEGER"):
+                col["type"] = "BIGINT"
+                col["nullable"] = True  # FK is nullable until a parent row exists
 
         # Add company_id FK → portfolio_company.id (Phase 5)
         if table_name in _get_company_fk_rules():
@@ -382,7 +393,7 @@ def schema_to_ddl(schema: dict) -> str:
     Improvements:
       - Uses CREATE TABLE IF NOT EXISTS for idempotency
       - Quotes reserved word identifiers
-      - FKs reference canonical_name (VARCHAR) not id (BIGSERIAL)
+      - FKs reference id (BIGSERIAL) — the PK on the parent table
       - Adds UNIQUE constraints on canonical_name
       - Adds CREATE INDEX statements for FK columns
       - Includes DEFAULT for timestamp columns

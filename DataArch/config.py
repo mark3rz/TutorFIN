@@ -45,7 +45,7 @@ EMBEDDING_DIMENSION: int = int(os.getenv("DATAARCH_EMBEDDING_DIM", "1024"))
 # ── Application ──────────────────────────────────────────────────────────────
 
 DATAARCH_ENV: str = os.getenv("DATAARCH_ENV", "dev")
-APP_VERSION: str = "0.8.0"
+APP_VERSION: str = "0.9.3"
 APP_NAME: str = "DataArch.AI"
 
 # ── Authentication ──────────────────────────────────────────────────────────

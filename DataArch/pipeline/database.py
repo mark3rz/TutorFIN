@@ -9,6 +9,7 @@ Provides:
   - Table stats (row counts)
 
 Phase 2, Steps 2.1 + 2.2
+FK note: all FK columns reference id (BIGSERIAL) on the parent table.
 """
 
 from __future__ import annotations

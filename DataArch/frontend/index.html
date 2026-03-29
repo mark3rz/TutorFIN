@@ -107,7 +107,7 @@
       </div>
       <div class="da-version-badge">
         <span class="da-status-dot" id="status-dot"></span>
-        <span>v0.8.0 &middot; Foundation</span>
+        <span>v0.9.0 &middot; Excel Intelligence</span>
       </div>
     </div>
   </aside>
@@ -314,6 +314,45 @@
 
 <!-- Toast container -->
 <div class="da-toast-container" id="toast-container"></div>
+
+<!-- ══════════ Excel Sheet Preview Modal ══════════ -->
+<div id="excel-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;padding:24px;">
+  <div id="excel-modal" style="background:var(--da-bg-2);border:1px solid var(--da-border);border-radius:12px;width:100%;max-width:800px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.35);">
+
+    <!-- Modal header -->
+    <div style="padding:20px 24px 16px;border-bottom:1px solid var(--da-border);flex-shrink:0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:var(--da-text-1);" id="excel-modal-title">Analysing Excel file…</div>
+          <div style="font-size:12px;color:var(--da-text-3);margin-top:2px;" id="excel-modal-subtitle"></div>
+        </div>
+        <button onclick="closeExcelModal()" style="background:none;border:none;cursor:pointer;color:var(--da-text-3);padding:4px;line-height:0;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal body -->
+    <div id="excel-modal-body" style="overflow-y:auto;padding:16px 24px;flex:1;">
+      <div id="excel-modal-loading" style="text-align:center;padding:40px 0;color:var(--da-text-3);">
+        <div class="da-spinner" style="margin:0 auto 12px;"></div>
+        <div style="font-size:13px;">Analysing workbook structure…</div>
+      </div>
+      <div id="excel-modal-sheets"></div>
+    </div>
+
+    <!-- Modal footer -->
+    <div id="excel-modal-footer" style="display:none;padding:16px 24px;border-top:1px solid var(--da-border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:12px;">
+      <div style="font-size:12px;color:var(--da-text-3);" id="excel-modal-summary"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="da-btn da-btn-ghost" onclick="closeExcelModal()">Cancel</button>
+        <button class="da-btn da-btn-primary" id="excel-modal-confirm" onclick="confirmExcelAndRun()">
+          Run Pipeline on Selected Sheets
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 const API = window.location.origin;
@@ -524,15 +563,216 @@ async function handleFiles(files) {
   const section = document.getElementById("pipeline-section");
   section.style.display = "block";
 
-  // Add animated border while pipeline runs
   const wrapper = document.getElementById("pipeline-steps-wrapper");
   wrapper.classList.add("da-pipeline-active");
 
   for (const file of files) {
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (ext === "xlsx" || ext === "xlsm") {
+      // Excel files: show sheet preview modal first
+      const confirmed = await showExcelPreviewModal(file);
+      if (!confirmed) {
+        addLog(`${file.name} — cancelled.`, "info");
+        continue;
+      }
+    }
     await runPipeline(file);
   }
 
   wrapper.classList.remove("da-pipeline-active");
+}
+
+// ── Excel Sheet Preview Modal ────────────────────────────────────────────────
+
+// Classification label → human-friendly display
+const SHEET_CLASS_LABELS = {
+  vendor_list:         "Vendor List",
+  headcount_roster:    "Headcount / Roster",
+  financial_statement: "Financial Statement",
+  revenue_model:       "Revenue Model",
+  cap_table:           "Cap Table",
+  budget:              "Budget",
+  contract_summary:    "Contract Summary",
+  transaction_log:     "Transaction Log",
+  other:               "Other",
+};
+
+const SHEET_CLASS_COLORS = {
+  vendor_list:         "#3b82f6",
+  headcount_roster:    "#8b5cf6",
+  financial_statement: "#10b981",
+  revenue_model:       "#f59e0b",
+  cap_table:           "#ef4444",
+  budget:              "#f97316",
+  contract_summary:    "#06b6d4",
+  transaction_log:     "#ec4899",
+  other:               "#6b7280",
+};
+
+const COL_TYPE_ICONS = {
+  currency:   "$",
+  percentage: "%",
+  date:       "📅",
+  integer:    "#",
+  decimal:    "0.0",
+  text:       "T",
+  formula:    "ƒ",
+  empty:      "—",
+};
+
+// Stores the pending file and analysis so confirmExcelAndRun() can access them
+let _excelPendingFile = null;
+let _excelPendingResolve = null;
+
+function showExcelPreviewModal(file) {
+  return new Promise(async (resolve) => {
+    _excelPendingFile = file;
+    _excelPendingResolve = resolve;
+
+    // Show modal in loading state
+    const backdrop = document.getElementById("excel-modal-backdrop");
+    backdrop.style.display = "flex";
+    document.getElementById("excel-modal-title").textContent = file.name;
+    document.getElementById("excel-modal-subtitle").textContent = "Analysing workbook structure…";
+    document.getElementById("excel-modal-loading").style.display = "block";
+    document.getElementById("excel-modal-sheets").innerHTML = "";
+    document.getElementById("excel-modal-footer").style.display = "none";
+
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`${API}/ingest/excel/analyze`, { method: "POST", body: form });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+        throw new Error(err.detail || "Analysis failed");
+      }
+      const analysis = await res.json();
+      renderExcelSheets(analysis);
+    } catch (e) {
+      document.getElementById("excel-modal-loading").style.display = "none";
+      document.getElementById("excel-modal-sheets").innerHTML = `
+        <div style="text-align:center;padding:32px 0;color:var(--da-text-3);">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:8px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div style="font-size:13px;margin-bottom:16px;">Could not analyse workbook: ${escapeHtml(e.message)}</div>
+          <button class="da-btn da-btn-primary da-btn-sm" onclick="confirmExcelAndRun()">Run Pipeline Anyway</button>
+        </div>`;
+      document.getElementById("excel-modal-footer").style.display = "none";
+    }
+  });
+}
+
+function renderExcelSheets(analysis) {
+  document.getElementById("excel-modal-loading").style.display = "none";
+  document.getElementById("excel-modal-subtitle").textContent =
+    `${analysis.sheet_count} sheet${analysis.sheet_count !== 1 ? "s" : ""} — ${analysis.structured_sheet_count} structured, ${analysis.sheet_count - analysis.structured_sheet_count} fallback`;
+
+  const container = document.getElementById("excel-modal-sheets");
+  let html = "";
+
+  for (const sheet of analysis.sheets) {
+    const color = SHEET_CLASS_COLORS[sheet.classification] || "#6b7280";
+    const label = SHEET_CLASS_LABELS[sheet.classification] || sheet.classification;
+    const isSkippable = sheet.total_rows === 0;
+    const defaultChecked = !isSkippable;
+
+    // Column pills — show up to 6
+    const visibleCols = sheet.columns.filter(c => c.header).slice(0, 6);
+    const extraCols = sheet.columns.filter(c => c.header).length - visibleCols.length;
+    const colPills = visibleCols.map(c => {
+      const icon = COL_TYPE_ICONS[c.col_type] || "·";
+      return `<span style="display:inline-flex;align-items:center;gap:3px;background:var(--da-bg-3);border:1px solid var(--da-border);border-radius:4px;padding:2px 7px;font-size:11px;color:var(--da-text-2);white-space:nowrap;">
+        <span style="font-size:9px;color:var(--da-text-3);">${icon}</span>${escapeHtml(c.header)}
+      </span>`;
+    }).join("");
+    const extraPill = extraCols > 0
+      ? `<span style="font-size:11px;color:var(--da-text-3);padding:2px 4px;">+${extraCols} more</span>`
+      : "";
+
+    // Formula column notice
+    const formulaNotice = sheet.formula_columns.length > 0
+      ? `<div style="font-size:11px;color:var(--da-text-3);margin-top:6px;">Formula columns: ${sheet.formula_columns.join(", ")}</div>`
+      : "";
+
+    // Skip reason notice
+    const skipNotice = sheet.skip_reason
+      ? `<div style="font-size:11px;color:var(--da-text-3);margin-top:4px;">ℹ ${escapeHtml(sheet.skip_reason)}</div>`
+      : "";
+
+    html += `
+    <div class="excel-sheet-card" id="sheet-card-${sheet.name.replace(/\W/g, '_')}"
+         style="border:1px solid var(--da-border);border-radius:8px;padding:14px 16px;margin-bottom:10px;background:var(--da-bg-1);opacity:${isSkippable ? 0.5 : 1};">
+      <div style="display:flex;align-items:flex-start;gap:12px;">
+
+        <!-- Toggle -->
+        <label style="display:flex;align-items:center;padding-top:2px;cursor:pointer;flex-shrink:0;">
+          <input type="checkbox" class="excel-sheet-toggle" data-sheet="${escapeHtml(sheet.name)}"
+                 ${defaultChecked ? "checked" : ""} ${isSkippable ? "disabled" : ""}
+                 onchange="updateExcelModalSummary()"
+                 style="width:16px;height:16px;accent-color:var(--da-blue);cursor:pointer;">
+        </label>
+
+        <!-- Sheet info -->
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:14px;font-weight:600;color:var(--da-text-1);">${escapeHtml(sheet.name)}</span>
+            <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:${color}22;color:${color};border:1px solid ${color}44;">
+              ${sheet.is_structured ? "✦ " : ""}${label}
+            </span>
+            ${sheet.is_structured
+              ? `<span style="font-size:11px;color:var(--da-text-3);">Row-by-row extraction</span>`
+              : `<span style="font-size:11px;color:var(--da-text-3);">Flat-text fallback</span>`
+            }
+          </div>
+
+          <!-- Stats row -->
+          <div style="display:flex;gap:16px;margin-top:6px;font-size:12px;color:var(--da-text-3);">
+            <span>${sheet.data_rows} data row${sheet.data_rows !== 1 ? "s" : ""}</span>
+            <span>${sheet.total_cols} column${sheet.total_cols !== 1 ? "s" : ""}</span>
+            ${sheet.has_merged_cells ? `<span>⚡ Merged cells resolved</span>` : ""}
+          </div>
+
+          <!-- Column pills -->
+          ${visibleCols.length > 0 ? `
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;">
+            ${colPills}${extraPill}
+          </div>` : ""}
+
+          ${formulaNotice}
+          ${skipNotice}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  container.innerHTML = html;
+  document.getElementById("excel-modal-footer").style.display = "flex";
+  updateExcelModalSummary();
+}
+
+function updateExcelModalSummary() {
+  const checkboxes = document.querySelectorAll(".excel-sheet-toggle");
+  const total = checkboxes.length;
+  const selected = [...checkboxes].filter(cb => cb.checked).length;
+  document.getElementById("excel-modal-summary").textContent =
+    `${selected} of ${total} sheet${total !== 1 ? "s" : ""} selected for processing`;
+  document.getElementById("excel-modal-confirm").disabled = selected === 0;
+}
+
+function closeExcelModal() {
+  document.getElementById("excel-modal-backdrop").style.display = "none";
+  if (_excelPendingResolve) {
+    _excelPendingResolve(false); // cancelled
+    _excelPendingResolve = null;
+    _excelPendingFile = null;
+  }
+}
+
+function confirmExcelAndRun() {
+  document.getElementById("excel-modal-backdrop").style.display = "none";
+  if (_excelPendingResolve) {
+    _excelPendingResolve(true); // confirmed — runPipeline will be called by handleFiles
+    _excelPendingResolve = null;
+  }
 }
 
 const PIPELINE_STEP_IDS = [
