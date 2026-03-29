@@ -6,7 +6,12 @@ No API key needed — tests use synthetic EntityRegistry data.
 from pipeline.ontology.schema import (
     EntityRegistry, OntologyRecord, OntologyType, MappingConfidence,
 )
-from pipeline.dataflow import build_graph, TYPE_COLORS, TYPE_LABELS
+from pipeline.dataflow import build_graph, _get_type_colors, _get_type_labels
+
+# TYPE_COLORS and TYPE_LABELS are None at module level (DB-backed, lazy-loaded).
+# Use the accessor functions directly in tests.
+TYPE_COLORS = _get_type_colors()
+TYPE_LABELS = _get_type_labels()
 
 
 def _make_record(

@@ -210,8 +210,10 @@ def test_generate_schema_nullable_columns():
     assert col_map["category"]["nullable"] is True
 
 
-def test_generate_schema_foreign_keys_reference_canonical_name():
-    """FK columns should reference canonical_name on the parent, not id."""
+def test_generate_schema_foreign_keys_reference_id():
+    """FK columns should reference id (BIGSERIAL PK) on the parent, not canonical_name.
+    Fixed in Queue #11 (v0.9.1): FKs reference integer PKs for referential integrity.
+    """
     registry = _build_registry(
         _make_record("v1", OntologyType.VENDOR, "Acme", {"vendor_id": "V001"}),
         _make_record("t1", OntologyType.TRANSACTION, "Invoice", {
@@ -223,11 +225,11 @@ def test_generate_schema_foreign_keys_reference_canonical_name():
     schema = generate_schema(registry)
     tx_table = [t for t in schema["tables"] if t["table_name"] == "transaction"][0]
 
-    # Phase 5: vendor_id FK + company_id FK = 2 FKs
+    # vendor_id FK should reference vendor.id (BIGSERIAL), not canonical_name
     vendor_fk = [fk for fk in tx_table["foreign_keys"] if fk["column"] == "vendor_id"]
     assert len(vendor_fk) == 1
     assert vendor_fk[0]["references_table"] == "vendor"
-    assert vendor_fk[0]["references_column"] == "canonical_name"
+    assert vendor_fk[0]["references_column"] == "id"
 
     # company_id FK should reference portfolio_company.id
     company_fk = [fk for fk in tx_table["foreign_keys"] if fk["column"] == "company_id"]
@@ -412,8 +414,10 @@ def test_ddl_has_default_now():
     assert "DEFAULT NOW()" in ddl
 
 
-def test_ddl_fk_references_canonical_name():
-    """FK constraints should reference canonical_name, not id."""
+def test_ddl_fk_references_id():
+    """FK constraints should reference id (BIGSERIAL PK), not canonical_name.
+    Fixed in Queue #11 (v0.9.1): FKs reference the integer PK for referential integrity.
+    """
     registry = _build_registry(
         _make_record("v1", OntologyType.VENDOR, "Acme", {"vendor_id": "V001"}),
         _make_record("t1", OntologyType.TRANSACTION, "Invoice", {
@@ -424,7 +428,7 @@ def test_ddl_fk_references_canonical_name():
     schema = generate_schema(registry)
     ddl = schema_to_ddl(schema)
 
-    assert "REFERENCES vendor(canonical_name)" in ddl
+    assert "REFERENCES vendor(id)" in ddl
 
 
 def test_ddl_includes_indexes():
@@ -490,6 +494,7 @@ def test_ddl_includes_foreign_keys():
     schema = generate_schema(registry)
     ddl = schema_to_ddl(schema)
 
-    assert "FOREIGN KEY (vendor_id) REFERENCES vendor(canonical_name)" in ddl
+    # Queue #11 (v0.9.1): FKs reference id (BIGSERIAL), not canonical_name
+    assert "FOREIGN KEY (vendor_id) REFERENCES vendor(id)" in ddl
     # Phase 5: company_id FK to portfolio_company
     assert "FOREIGN KEY (company_id) REFERENCES portfolio_company(id)" in ddl

@@ -177,13 +177,22 @@ def _csv_to_text(file_path: Path) -> str:
 
 # ── Main parse entry point ────────────────────────────────────────────────────
 
-def parse(file_path: Path) -> ParsedDocument:
+def parse(
+    file_path: Path,
+    selected_sheets: list[str] | None = None,
+) -> ParsedDocument:
     """
     Parse an Excel (.xlsx, .xlsm) or CSV file.
 
     For Excel files, runs excel_intelligence analysis first, then routes
     each sheet to the appropriate extraction strategy (structured or flat-text).
     For CSV files, uses the legacy flat-text path.
+
+    Args:
+        file_path: Path to the Excel or CSV file.
+        selected_sheets: Optional list of sheet names to process. If provided,
+            only these sheets are extracted; all others are skipped. None means
+            process all sheets (default behaviour). CSV files ignore this param.
 
     Returns a ParsedDocument compatible with all downstream pipeline stages.
     """
@@ -262,8 +271,18 @@ def parse(file_path: Path) -> ParsedDocument:
             errors=errors,
         )
 
+    # Build a normalised set for O(1) lookup (preserves original case)
+    sheet_filter: set[str] | None = set(selected_sheets) if selected_sheets else None
+    skipped_by_user: list[str] = []
+
     # Process each sheet with the appropriate strategy
     for sheet in analysis.sheets:
+        # v0.9.5: honour user's sheet selection from the frontend modal
+        if sheet_filter is not None and sheet.name not in sheet_filter:
+            logger.info(f"  Skipping sheet '{sheet.name}' (not selected by user)")
+            skipped_by_user.append(sheet.name)
+            continue
+
         if sheet.total_rows == 0:
             logger.info(f"  Skipping empty sheet '{sheet.name}'")
             continue
@@ -294,6 +313,11 @@ def parse(file_path: Path) -> ParsedDocument:
         f"{unstructured_count} sheet(s) processed with flat-text extraction. "
         f"Total entities extracted: {len(all_entities)}."
     )
+    if skipped_by_user:
+        summary += (
+            f" User skipped {len(skipped_by_user)} sheet(s): "
+            f"{', '.join(skipped_by_user)}."
+        )
 
     status = ExtractionStatus.SUCCESS if all_entities else ExtractionStatus.PARTIAL
     if errors and not all_entities:

@@ -47,10 +47,19 @@ def _output_name(path: Path) -> str:
     return f"{path.stem}_{file_hash}"
 
 
-def ingest(file_path: str | Path) -> ParsedDocument:
+def ingest(
+    file_path: str | Path,
+    selected_sheets: list[str] | None = None,
+) -> ParsedDocument:
     """
     Ingest a single document. Returns a ParsedDocument.
     Saves output JSON to outputs/<stem>_<hash>.json automatically.
+
+    Args:
+        file_path: Path to the file to ingest.
+        selected_sheets: For Excel files (.xlsx/.xlsm), only process the named
+            sheets. None or empty list means process all sheets. Ignored for
+            non-Excel formats.
     """
     path = Path(file_path)
 
@@ -68,7 +77,14 @@ def ingest(file_path: str | Path) -> ParsedDocument:
         raise ValueError(msg)
 
     print(f"[DataArch] Ingesting: {path.name} ({suffix})")
-    result = parser(path)
+
+    # Pass selected_sheets only for Excel formats; other parsers don't support it
+    if suffix in (".xlsx", ".xlsm") and selected_sheets:
+        print(f"[DataArch] Sheet filter: {selected_sheets}")
+        result = parser(path, selected_sheets=selected_sheets)
+    else:
+        result = parser(path)
+
     print(f"[DataArch] Status: {result.status} | Entities: {len(result.entities)}")
 
     # Save output with hash-based naming

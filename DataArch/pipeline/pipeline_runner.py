@@ -84,6 +84,7 @@ class PipelineJob:
     document_id: str | None = None
     company_id: int | None = None       # Phase 5: portfolio company association
     company_slug: str | None = None     # Phase 5: resolved from company_id
+    selected_sheets: list[str] | None = None  # v0.9.5: user-selected Excel sheets (None = all)
 
     def __post_init__(self):
         if not self.steps:
@@ -101,6 +102,7 @@ class PipelineJob:
             "document_id": self.document_id,
             "company_id": self.company_id,
             "company_slug": self.company_slug,
+            "selected_sheets": self.selected_sheets,
             "error": self.error,
             "steps": {
                 name: {
@@ -196,6 +198,7 @@ def _job_from_dict(d: dict) -> PipelineJob:
         document_id=d.get("document_id"),
         company_id=d.get("company_id"),
         company_slug=d.get("company_slug"),
+        selected_sheets=d.get("selected_sheets"),
     )
     # Restore per-step results if available
     steps_data = d.get("steps") or {}
@@ -278,6 +281,7 @@ def run_pipeline(
     filename: str,
     skip_embed: bool = False,
     company_id: int | None = None,
+    selected_sheets: list[str] | None = None,
 ) -> str:
     """
     Launch the full pipeline as a background thread.
@@ -287,12 +291,19 @@ def run_pipeline(
         filename: Original filename (for naming outputs).
         skip_embed: If True, skip the embedding step (no Voyage API key).
         company_id: Portfolio company ID to associate entities with (Phase 5).
+        selected_sheets: List of Excel sheet names to process. None = process all.
+            Only relevant for .xlsx/.xlsm files; ignored for other formats.
 
     Returns:
         job_id: Unique identifier for polling status.
     """
     job_id = str(uuid.uuid4())[:8]
-    job = PipelineJob(job_id=job_id, filename=filename, company_id=company_id)
+    job = PipelineJob(
+        job_id=job_id,
+        filename=filename,
+        company_id=company_id,
+        selected_sheets=selected_sheets,
+    )
 
     with _lock:
         _jobs[job_id] = job
@@ -369,8 +380,15 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
         from pipeline.ingest import ingest
         from pipeline.schema import ParsedDocument
 
+        if job.selected_sheets:
+            logger.info(
+                f"[{job.job_id}] Sheet filter active: processing "
+                f"{len(job.selected_sheets)} sheet(s): {job.selected_sheets}"
+            )
+
         parsed: ParsedDocument = _run_step(
-            job, "ingest", ingest, file_path
+            job, "ingest", ingest, file_path,
+            selected_sheets=job.selected_sheets,
         )
         persist_step_update(job.job_id, _steps_to_dict(job))
         doc_id = file_path.stem.replace(" ", "_")

@@ -191,7 +191,23 @@ def confidence_from_str(s: str) -> MappingConfidence:
 
 
 def ontology_type_from_str(s: str) -> OntologyType:
+    """
+    Convert a string to an OntologyType, returning UNKNOWN for unrecognised values.
+
+    Note: OntologyType._missing_ allows any string to be used as a dynamic enum
+    value (so DB-defined types work at runtime). We must therefore validate against
+    the set of known types explicitly rather than relying on ValueError.
+    """
+    normalised = s.lower().strip()
+    # Check static enum members first (always valid)
+    for member in OntologyType.__members__.values():
+        if member.value == normalised:
+            return member
+    # Check DB-backed types via the ontology service
     try:
-        return OntologyType(s.lower())
-    except ValueError:
-        return OntologyType.UNKNOWN
+        from services.ontology_service import get_type_names
+        if normalised in get_type_names():
+            return OntologyType(normalised)
+    except Exception:
+        pass
+    return OntologyType.UNKNOWN

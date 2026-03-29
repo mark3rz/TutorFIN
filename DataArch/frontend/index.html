@@ -107,7 +107,7 @@
       </div>
       <div class="da-version-badge">
         <span class="da-status-dot" id="status-dot"></span>
-        <span>v0.9.0 &middot; Excel Intelligence</span>
+        <span>v0.9.5 &middot; Excel Intelligence</span>
       </div>
     </div>
   </aside>
@@ -157,6 +157,23 @@
         </div>
       </div>
       <input type="file" id="file-input" accept=".pdf,.xlsx,.xlsm,.csv,.docx,.eml" multiple style="display:none">
+
+      <!-- ── Excel Templates ── -->
+      <div class="da-card da-mt-24" id="templates-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div>
+            <div class="da-card-title" style="margin-bottom:2px;">Download Upload Templates</div>
+            <div style="font-size:12px;color:var(--da-text-3);">Pre-formatted .xlsx files — fill in and upload to DataArch</div>
+          </div>
+          <button class="da-btn da-btn-ghost da-btn-sm" onclick="document.getElementById('template-grid').style.display = document.getElementById('template-grid').style.display === 'none' ? 'grid' : 'none'">
+            Toggle
+          </button>
+        </div>
+        <div id="template-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
+          <!-- Populated by loadTemplates() -->
+          <div class="da-empty" style="grid-column:1/-1;padding:16px 0;"><div class="da-spinner" style="margin:0 auto;"></div></div>
+        </div>
+      </div>
 
       <div id="pipeline-section" style="display:none">
         <div class="da-card-title da-mt-24">Pipeline Progress</div>
@@ -623,6 +640,7 @@ const COL_TYPE_ICONS = {
 // Stores the pending file and analysis so confirmExcelAndRun() can access them
 let _excelPendingFile = null;
 let _excelPendingResolve = null;
+let _excelSelectedSheets = null; // null = process all sheets (non-Excel or analysis failed)
 
 function showExcelPreviewModal(file) {
   return new Promise(async (resolve) => {
@@ -760,6 +778,7 @@ function updateExcelModalSummary() {
 
 function closeExcelModal() {
   document.getElementById("excel-modal-backdrop").style.display = "none";
+  _excelSelectedSheets = null; // clear any pending selection
   if (_excelPendingResolve) {
     _excelPendingResolve(false); // cancelled
     _excelPendingResolve = null;
@@ -769,6 +788,13 @@ function closeExcelModal() {
 
 function confirmExcelAndRun() {
   document.getElementById("excel-modal-backdrop").style.display = "none";
+  // Collect checked sheet names; if no toggles exist (e.g. analysis failed), use null = process all
+  const checkboxes = document.querySelectorAll(".excel-sheet-toggle");
+  if (checkboxes.length > 0) {
+    _excelSelectedSheets = [...checkboxes].filter(cb => cb.checked).map(cb => cb.dataset.sheet);
+  } else {
+    _excelSelectedSheets = null; // no sheet info available — let server process all
+  }
   if (_excelPendingResolve) {
     _excelPendingResolve(true); // confirmed — runPipeline will be called by handleFiles
     _excelPendingResolve = null;
@@ -810,6 +836,15 @@ async function runPipeline(file) {
     form.append("file", file);
     const companyId = document.getElementById("upload-company-select").value;
     if (companyId) form.append("company_id", companyId);
+    // Append user-selected sheets (set by confirmExcelAndRun for .xlsx/.xlsm files)
+    if (_excelSelectedSheets !== null) {
+      for (const sheetName of _excelSelectedSheets) {
+        form.append("selected_sheets", sheetName);
+      }
+      const skipped = _excelSelectedSheets.length;
+      addLog(`Sheet selection: processing ${skipped} sheet${skipped !== 1 ? "s" : ""} as selected.`, "info");
+    }
+    _excelSelectedSheets = null; // reset for next upload
     const res = await fetch(`${API}/pipeline/run`, { method: "POST", body: form });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
@@ -953,10 +988,15 @@ function renderRegistry(data) {
       <th>Name</th><th>Type</th><th>Company</th><th>Confidence</th><th>Aliases</th><th>Source</th>
     </tr></thead><tbody>`;
 
+  // Build slug→id map from cached companies for the company filter
+  const slugToId = {};
+  (cachedCompanies || []).forEach(c => { slugToId[c.slug] = String(c.id); });
+
   for (const r of records.sort((a, b) => a.canonical_name.localeCompare(b.canonical_name))) {
     const companySlug = r.company_slug || "";
+    const companyId = slugToId[companySlug] || "";
     const confClass = r.confidence === "high" ? "da-conf-high" : r.confidence === "medium" ? "da-conf-medium" : "da-conf-low";
-    html += `<tr data-search="${(r.canonical_name + " " + r.ontology_type + " " + companySlug + " " + (r.aliases || []).join(" ")).toLowerCase()}" data-company="${companySlug}">
+    html += `<tr data-search="${(r.canonical_name + " " + r.ontology_type + " " + companySlug + " " + (r.aliases || []).join(" ")).toLowerCase()}" data-company="${companySlug}" data-companyid="${companyId}">
       <td><strong>${r.canonical_name}</strong></td>
       <td><span class="da-badge da-badge-${r.ontology_type}">${r.ontology_type}</span></td>
       <td>${companySlug ? `<span style="color:var(--da-blue);font-size:12px;">${escapeHtml(companySlug)}</span>` : '<span style="color:var(--da-text-3);font-size:12px;">-</span>'}</td>
@@ -969,12 +1009,9 @@ function renderRegistry(data) {
   container.innerHTML = html;
 }
 
-// Search
-document.getElementById("registry-search").addEventListener("input", e => {
-  const q = e.target.value.toLowerCase();
-  document.querySelectorAll("#registry-table-container tbody tr").forEach(row => {
-    row.style.display = row.dataset.search.includes(q) ? "" : "none";
-  });
+// Search — respects active company filter
+document.getElementById("registry-search").addEventListener("input", () => {
+  filterRegistryByCompany();
 });
 
 // ── Schema View ─────────────────────────────────────────────────────────────
@@ -1320,13 +1357,12 @@ async function createCompanyFromUpload() {
 
 function filterRegistryByCompany() {
   const sel = document.getElementById("registry-company-filter");
-  const companySlug = sel.options[sel.selectedIndex]?.textContent?.split(" (")[0] || "";
-  const filterVal = sel.value;
+  const filterVal = sel.value; // company id string, or "" for all
+  const q = document.getElementById("registry-search").value.toLowerCase();
   document.querySelectorAll("#registry-table-container tbody tr").forEach(row => {
-    if (!filterVal) { row.style.display = ""; return; }
-    const rowCompany = row.dataset.company || "";
-    // Match by checking if the company slug is in the row data
-    row.style.display = rowCompany ? "" : "none";
+    const matchesSearch = !q || row.dataset.search.includes(q);
+    const matchesCompany = !filterVal || row.dataset.companyid === filterVal;
+    row.style.display = (matchesSearch && matchesCompany) ? "" : "none";
   });
 }
 
@@ -1433,6 +1469,51 @@ async function loadVendorOverlap() {
     container.innerHTML = `<div class="da-empty"><p>Could not load vendor overlap data.</p></div>`;
   }
 }
+
+// ── Excel Template Downloads ─────────────────────────────────────────────────
+const TEMPLATE_ICONS = {
+  vendor:           `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`,
+  customer:         `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  employee:         `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+  product:          `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`,
+  transaction:      `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
+  contract:         `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+  financial_record: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+  business_unit:    `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`,
+};
+
+async function loadTemplates() {
+  const grid = document.getElementById("template-grid");
+  if (!grid) return;
+  try {
+    const res = await fetch(`${API}/ingest/templates`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const templates = Object.values(data.templates || {});
+    if (templates.length === 0) {
+      grid.innerHTML = `<div class="da-empty" style="grid-column:1/-1;">No templates available.</div>`;
+      return;
+    }
+    grid.innerHTML = templates.map(t => {
+      const icon = TEMPLATE_ICONS[t.entity_type] || TEMPLATE_ICONS.product;
+      const label = t.entity_type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      return `
+        <a href="${API}${t.download_url}" download="${t.filename}"
+           style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 10px;background:var(--da-bg-1);border:1px solid var(--da-border);border-radius:8px;text-decoration:none;color:var(--da-text-1);cursor:pointer;transition:border-color 0.15s,background 0.15s;"
+           onmouseover="this.style.borderColor='var(--da-blue)';this.style.background='var(--da-bg-3)'"
+           onmouseout="this.style.borderColor='var(--da-border)';this.style.background='var(--da-bg-1)'"
+           title="Download ${label} template (${t.column_count} columns)">
+          <span style="color:var(--da-blue);opacity:0.8;">${icon}</span>
+          <span style="font-size:12px;font-weight:600;text-align:center;">${label}</span>
+          <span style="font-size:10px;color:var(--da-text-3);">${t.column_count} cols &middot; .xlsx</span>
+        </a>`;
+    }).join("");
+  } catch (e) {
+    grid.innerHTML = `<div class="da-empty" style="grid-column:1/-1;font-size:12px;color:var(--da-text-3);">Could not load templates.</div>`;
+  }
+}
+
+loadTemplates();
 
 // ── Connection Status Check ──────────────────────────────────────────────────
 async function checkHealth() {

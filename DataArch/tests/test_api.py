@@ -132,7 +132,8 @@ def test_create_company_success():
         id=1, name="Test Corp", slug="test-corp", status="active",
     )
 
-    with patch("api.create_company", return_value=mock_company):
+    # Helpers live in routes/portfolio.py, not api.py
+    with patch("routes.portfolio.create_company", return_value=mock_company):
         res = client.post("/companies", json={"name": "Test Corp", "sector": "Technology"})
         assert res.status_code == 201
         data = res.json()
@@ -150,7 +151,7 @@ def test_list_companies_success():
         PortfolioCompany(id=2, name="B Corp", slug="b-corp"),
     ]
 
-    with patch("api.list_companies", return_value=mock_companies):
+    with patch("routes.portfolio.list_companies", return_value=mock_companies):
         res = client.get("/companies")
         assert res.status_code == 200
         data = res.json()
@@ -160,7 +161,7 @@ def test_list_companies_success():
 
 def test_get_company_not_found():
     """GET /companies/{id} should 404 for nonexistent company."""
-    with patch("api.get_company", return_value=None):
+    with patch("routes.portfolio.get_company", return_value=None):
         res = client.get("/companies/999")
         assert res.status_code == 404
 
@@ -171,7 +172,7 @@ def test_get_company_success():
 
     mock_company = PortfolioCompany(id=1, name="Acme", slug="acme", sector="Tech")
 
-    with patch("api.get_company", return_value=mock_company):
+    with patch("routes.portfolio.get_company", return_value=mock_company):
         res = client.get("/companies/1")
         assert res.status_code == 200
         data = res.json()
@@ -181,7 +182,7 @@ def test_get_company_success():
 
 def test_update_company_not_found():
     """PUT /companies/{id} should 404 for nonexistent company."""
-    with patch("api.update_company", return_value=None):
+    with patch("routes.portfolio.update_company", return_value=None):
         res = client.put("/companies/999", json={"sector": "FinTech"})
         assert res.status_code == 404
 
@@ -194,7 +195,7 @@ def test_update_company_success():
         id=1, name="Acme", slug="acme", sector="FinTech", status="active",
     )
 
-    with patch("api.update_company", return_value=mock_company):
+    with patch("routes.portfolio.update_company", return_value=mock_company):
         res = client.put("/companies/1", json={"sector": "FinTech"})
         assert res.status_code == 200
         assert res.json()["sector"] == "FinTech"

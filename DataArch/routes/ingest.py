@@ -2,12 +2,15 @@
 routes/ingest.py — Document ingestion and results endpoints.
 
 Endpoints:
-  POST /ingest            Upload a document, get structured extraction
-  GET  /results           List all saved output files
-  GET  /results/{id}      Fetch a specific result by filename stem
-  POST /pipeline/run      One-click full pipeline (background job)
-  GET  /pipeline/status/{id}  Poll pipeline job status
-  GET  /pipeline/jobs     List recent pipeline jobs
+  POST /ingest                         Upload a document, get structured extraction
+  GET  /results                        List all saved output files
+  GET  /results/{id}                   Fetch a specific result by filename stem
+  POST /pipeline/run                   One-click full pipeline (background job); accepts optional selected_sheets
+  GET  /pipeline/status/{id}           Poll pipeline job status
+  GET  /pipeline/jobs                  List recent pipeline jobs
+  POST /ingest/excel/analyze           Pre-analyze an Excel file (sheet classification, no pipeline)
+  GET  /ingest/template/{entity_type}  Download a .xlsx upload template for an entity type
+  GET  /ingest/templates               List all available templates with column definitions
 """
 
 from __future__ import annotations
@@ -16,10 +19,10 @@ import json
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 import config
 from auth import TokenUser, get_optional_user
@@ -131,12 +134,18 @@ async def pipeline_run(
     request: Request,
     file: UploadFile = File(...),
     company_id: Optional[int] = Form(None),
+    selected_sheets: Optional[List[str]] = Form(None),
     user: Optional[TokenUser] = Depends(get_optional_user),
 ):
     """One-click pipeline: upload a document and run the full pipeline.
 
     Steps: ingest → ontology → schema → database create → data load → embed.
     Returns immediately with a job_id. Poll GET /pipeline/status/{job_id} for progress.
+
+    Optional form fields:
+        selected_sheets — list of sheet names to process (Excel only).
+            If omitted or null, all sheets are processed.
+            Send multiple form values: selected_sheets=Sheet1&selected_sheets=Sheet2
     """
     from pipeline.pipeline_runner import run_pipeline
 
@@ -183,6 +192,7 @@ async def pipeline_run(
         filename=file.filename,
         skip_embed=skip_embed,
         company_id=company_id,
+        selected_sheets=selected_sheets or None,  # normalize empty list → None
     )
 
     log_action(
@@ -190,7 +200,12 @@ async def pipeline_run(
         action="pipeline_run",
         resource_type="document",
         resource_id=file.filename,
-        details={"job_id": job_id, "company_id": company_id, "size_bytes": len(content)},
+        details={
+            "job_id": job_id,
+            "company_id": company_id,
+            "size_bytes": len(content),
+            "selected_sheets": selected_sheets or None,
+        },
         ip_address=get_client_ip(request),
     )
 
@@ -316,3 +331,92 @@ async def analyze_excel(
     )
 
     return JSONResponse(content=result)
+
+
+# ── Excel template download ─────────────────────────────────────────────────
+
+@router.get("/ingest/template/{entity_type}")
+async def download_template(
+    entity_type: str,
+    user: Optional[TokenUser] = Depends(get_optional_user),
+):
+    """
+    Download a pre-formatted .xlsx upload template for the given entity type.
+
+    The template contains:
+      - A 'Data' sheet with column headers, an example row, and 48 blank rows
+      - Column-level data validation where applicable (dropdowns, date formats)
+      - An 'Instructions' sheet with field descriptions and examples
+
+    Path parameter:
+        entity_type — one of: vendor, customer, employee, product,
+                      transaction, contract, financial_record, business_unit
+
+    Returns:
+        application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+        Content-Disposition: attachment; filename="dataarch_<entity_type>_template.xlsx"
+    """
+    from pipeline.excel_templates import generate_template, get_supported_entity_types
+
+    supported = get_supported_entity_types()
+    if entity_type.lower() not in supported:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"No template available for entity type '{entity_type}'. "
+                f"Supported types: {supported}"
+            ),
+        )
+
+    try:
+        xlsx_bytes = generate_template(entity_type.lower())
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Template generation failed: {e}")
+
+    filename = f"dataarch_{entity_type.lower()}_template.xlsx"
+
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/ingest/templates")
+async def list_templates(
+    user: Optional[TokenUser] = Depends(get_optional_user),
+):
+    """
+    List all available entity type templates with their column definitions.
+
+    Returns a JSON object mapping each entity type to its template metadata,
+    useful for building a template picker UI or API docs.
+    """
+    from pipeline.excel_templates import get_supported_entity_types, get_template_columns
+
+    result = {}
+    for entity_type in get_supported_entity_types():
+        cols = get_template_columns(entity_type)
+        result[entity_type] = {
+            "entity_type": entity_type,
+            "download_url": f"/ingest/template/{entity_type}",
+            "filename": f"dataarch_{entity_type}_template.xlsx",
+            "column_count": len(cols),
+            "columns": [
+                {
+                    "name": c["name"],
+                    "header": c["header"],
+                    "description": c["description"],
+                    "required": c.get("required", False),
+                    "sql_type_hint": c.get("sql_type_hint", "VARCHAR(255)"),
+                }
+                for c in cols
+            ],
+        }
+
+    return JSONResponse(content={
+        "template_count": len(result),
+        "templates": result,
+    })

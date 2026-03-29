@@ -134,15 +134,18 @@ class TestMergeHistoryEntry:
 
 class TestConstants:
     def test_resolvable_tables(self):
+        # transaction (is_resolvable=False) and financial_record (is_resolvable=False)
+        # are intentionally excluded — you don't deduplicate transactional line items
+        # or aggregate financial records. The 6 resolvable types are entity tables only.
         assert "vendor" in RESOLVABLE_TABLES
         assert "customer" in RESOLVABLE_TABLES
         assert "employee" in RESOLVABLE_TABLES
         assert "product" in RESOLVABLE_TABLES
-        assert "transaction" in RESOLVABLE_TABLES
         assert "contract" in RESOLVABLE_TABLES
-        assert "financial_record" in RESOLVABLE_TABLES
         assert "business_unit" in RESOLVABLE_TABLES
-        assert len(RESOLVABLE_TABLES) == 8
+        assert "transaction" not in RESOLVABLE_TABLES
+        assert "financial_record" not in RESOLVABLE_TABLES
+        assert len(RESOLVABLE_TABLES) == 6
 
     def test_merge_history_ddl_structure(self):
         assert "CREATE TABLE IF NOT EXISTS entity_merge_history" in MERGE_HISTORY_DDL

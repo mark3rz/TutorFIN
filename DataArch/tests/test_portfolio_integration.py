@@ -17,7 +17,11 @@ from pipeline.ontology.schema import (
     OntologyRecord, OntologyResult, EntityRegistry,
     OntologyType, MappingConfidence,
 )
-from pipeline.schema_generator import generate_schema, COMPANY_FK_RULES
+from pipeline.schema_generator import generate_schema, _get_company_fk_rules
+
+# COMPANY_FK_RULES is a lazy-loaded None stub at module level in schema_generator.
+# Use the accessor function directly so tests work without a DB connection.
+COMPANY_FK_RULES = _get_company_fk_rules()
 from pipeline.ontology.mapper import _make_id
 from pipeline.data_loader import _upsert_entity, transform_value
 from pipeline.ai_analyst import _format_schema_for_prompt, ANALYST_SYSTEM_PROMPT
@@ -357,7 +361,7 @@ class TestPortfolioAPI:
         res = client.get("/portfolio/vendor-overlap")
         assert res.status_code in (200, 500)
 
-    @patch("api.get_company")
+    @patch("routes.portfolio.get_company")
     def test_company_detail_not_found(self, mock_get, client):
         mock_get.return_value = None
         res = client.get("/portfolio/company/999/detail")
@@ -368,9 +372,20 @@ class TestPortfolioAPI:
 
 
 class TestEntityResolutionIntegration:
-    def test_resolvable_tables_match_entity_tables(self):
-        """RESOLVABLE_TABLES should match ENTITY_TABLES from ai_search."""
-        assert set(RESOLVABLE_TABLES) == set(ENTITY_TABLES)
+    def test_resolvable_tables_are_subset_of_entity_tables(self):
+        """RESOLVABLE_TABLES should be a subset of ENTITY_TABLES.
+
+        transaction and financial_record have is_entity_table=True but
+        is_resolvable=False — you don't deduplicate transactional line items
+        or aggregate financial records.  RESOLVABLE_TABLES is intentionally
+        smaller than ENTITY_TABLES.
+        """
+        assert set(RESOLVABLE_TABLES).issubset(set(ENTITY_TABLES))
+        # The non-resolvable types are transaction and financial_record
+        assert "transaction" in ENTITY_TABLES
+        assert "financial_record" in ENTITY_TABLES
+        assert "transaction" not in RESOLVABLE_TABLES
+        assert "financial_record" not in RESOLVABLE_TABLES
 
     def test_merge_history_ddl_has_jsonb_snapshot(self):
         assert "previous_state JSONB" in MERGE_HISTORY_DDL
