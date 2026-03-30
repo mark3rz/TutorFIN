@@ -8,6 +8,7 @@ Endpoints:
   POST /pipeline/run                   One-click full pipeline (background job); accepts optional selected_sheets
   GET  /pipeline/status/{id}           Poll pipeline job status
   GET  /pipeline/jobs                  List recent pipeline jobs
+  GET  /documents                      Document library — all uploads with status, entity count, date
   POST /ingest/excel/analyze           Pre-analyze an Excel file (sheet classification, no pipeline)
   GET  /ingest/template/{entity_type}  Download a .xlsx upload template for an entity type
   GET  /ingest/templates               List all available templates with column definitions
@@ -25,7 +26,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import JSONResponse, Response
 
 import config
-from auth import TokenUser, get_optional_user
+from auth import TokenUser, get_current_user
 from pipeline.ingest import ingest
 from pipeline.schema import ParsedDocument
 from services.audit import get_client_ip, log_action
@@ -55,7 +56,7 @@ MAGIC_BYTES = {
 async def ingest_document(
     request: Request,
     file: UploadFile = File(...),
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """Upload a document (PDF, Excel, DOCX, CSV, EML). Returns structured extraction."""
     suffix = Path(file.filename).suffix.lower()
@@ -98,7 +99,7 @@ async def ingest_document(
             named_path.unlink()
 
     log_action(
-        user_id=user.id if user else None,
+        user_id=user.id,
         action="ingest",
         resource_type="document",
         resource_id=file.filename,
@@ -112,14 +113,20 @@ async def ingest_document(
 # ── Results ────────────────────────────────────────────────────────────────
 
 @router.get("/results")
-def list_results(user: Optional[TokenUser] = Depends(get_optional_user)):
-    """List all previously parsed document results."""
-    files = sorted(OUTPUTS_DIR.glob("*.json"))
-    return {"count": len(files), "results": [f.stem for f in files]}
+def list_results(
+    offset: int = 0,
+    limit: int = 50,
+    user: TokenUser = Depends(get_current_user),
+):
+    """List previously parsed document results, newest first."""
+    files = sorted(OUTPUTS_DIR.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+    total = len(files)
+    page = files[offset : offset + limit]
+    return {"total": total, "offset": offset, "limit": limit, "results": [f.stem for f in page]}
 
 
 @router.get("/results/{document_id}")
-def get_result(document_id: str, user: Optional[TokenUser] = Depends(get_optional_user)):
+def get_result(document_id: str, user: TokenUser = Depends(get_current_user)):
     """Fetch a specific parsed result by document name (without .json)."""
     path = OUTPUTS_DIR / f"{document_id}.json"
     if not path.exists():
@@ -135,7 +142,7 @@ async def pipeline_run(
     file: UploadFile = File(...),
     company_id: Optional[int] = Form(None),
     selected_sheets: Optional[List[str]] = Form(None),
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """One-click pipeline: upload a document and run the full pipeline.
 
@@ -184,7 +191,7 @@ async def pipeline_run(
     skip_embed = not config.VOYAGE_API_KEY
 
     # If user is company-scoped, enforce their company_id
-    if user and not user.is_pe_admin and user.company_id:
+    if not user.is_pe_admin and user.company_id:
         company_id = user.company_id
 
     job_id = run_pipeline(
@@ -196,7 +203,7 @@ async def pipeline_run(
     )
 
     log_action(
-        user_id=user.id if user else None,
+        user_id=user.id,
         action="pipeline_run",
         resource_type="document",
         resource_id=file.filename,
@@ -219,7 +226,7 @@ async def pipeline_run(
 
 
 @router.get("/pipeline/status/{job_id}")
-def pipeline_status(job_id: str, user: Optional[TokenUser] = Depends(get_optional_user)):
+def pipeline_status(job_id: str, user: TokenUser = Depends(get_current_user)):
     """Poll the status of a pipeline job."""
     from pipeline.pipeline_runner import get_job
 
@@ -230,11 +237,98 @@ def pipeline_status(job_id: str, user: Optional[TokenUser] = Depends(get_optiona
 
 
 @router.get("/pipeline/jobs")
-def pipeline_jobs(user: Optional[TokenUser] = Depends(get_optional_user)):
-    """List recent pipeline jobs (newest first)."""
+def pipeline_jobs(
+    offset: int = 0,
+    limit: int = 20,
+    user: TokenUser = Depends(get_current_user),
+):
+    """List recent pipeline jobs (newest first), with pagination."""
     from pipeline.pipeline_runner import list_jobs
 
-    return JSONResponse(content={"jobs": list_jobs()})
+    all_jobs = list_jobs(limit=500)  # fetch a generous pool then slice
+    total = len(all_jobs)
+    page = all_jobs[offset : offset + limit]
+    return JSONResponse(content={"total": total, "offset": offset, "limit": limit, "jobs": page})
+
+
+# ── Document Library ───────────────────────────────────────────────────────
+
+@router.get("/documents")
+def list_documents(
+    company_id: Optional[int] = None,
+    status: Optional[str] = None,
+    offset: int = 0,
+    limit: int = 50,
+    user: TokenUser = Depends(get_current_user),
+):
+    """
+    Document library — list all uploaded files with processing status,
+    entity count extracted, upload timestamp, and duration.
+
+    Sourced from the pipeline_jobs table (most reliable metadata source).
+
+    Query params:
+        company_id  — filter to a specific portfolio company
+        status      — filter by job status (queued|running|completed|failed|partial)
+        offset      — pagination offset (default 0)
+        limit       — page size (default 50)
+    """
+    from services.job_store import load_recent_jobs
+
+    # Enforce company scoping for non-PE admins
+    if not user.is_pe_admin and user.company_id:
+        company_id = user.company_id
+
+    all_jobs = load_recent_jobs(limit=1000)
+
+    documents = []
+    for job in all_jobs:
+        # Apply optional filters
+        if company_id is not None and job.get("company_id") != company_id:
+            continue
+        if status and job.get("status") != status:
+            continue
+
+        # Extract entity count from the ingest step detail
+        steps = job.get("steps") or {}
+        ingest_detail = (steps.get("ingest") or {}).get("detail") or {}
+        entity_count = ingest_detail.get("entities", 0)
+        ingest_status = ingest_detail.get("status", "")
+
+        # Resolve company name from company_id (best-effort)
+        company_name = None
+        cid = job.get("company_id")
+        if cid:
+            try:
+                from pipeline.company import get_company
+                co = get_company(cid)
+                company_name = co.name if co else None
+            except Exception:
+                pass
+
+        documents.append({
+            "job_id": job["job_id"],
+            "filename": job["filename"],
+            "status": job["status"],
+            "company_id": cid,
+            "company_name": company_name,
+            "entity_count": entity_count or 0,
+            "extraction_status": ingest_status,
+            "uploaded_at": job.get("created_at"),
+            "completed_at": job.get("completed_at"),
+            "duration_ms": job.get("duration_ms"),
+            "error": job.get("error"),
+        })
+
+    total = len(documents)
+    page = documents[offset : offset + limit]
+
+    return JSONResponse(content={
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "documents": page,
+    })
 
 
 # ── Excel pre-analysis ──────────────────────────────────────────────────────
@@ -243,7 +337,7 @@ def pipeline_jobs(user: Optional[TokenUser] = Depends(get_optional_user)):
 async def analyze_excel(
     request: Request,
     file: UploadFile = File(...),
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """
     Analyse an Excel file's structure WITHOUT running the full pipeline.
@@ -322,7 +416,7 @@ async def analyze_excel(
             named_path.unlink()
 
     log_action(
-        user_id=user.id if user else None,
+        user_id=user.id,
         action="excel_analyze",
         resource_type="document",
         resource_id=file.filename,
@@ -338,7 +432,7 @@ async def analyze_excel(
 @router.get("/ingest/template/{entity_type}")
 async def download_template(
     entity_type: str,
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """
     Download a pre-formatted .xlsx upload template for the given entity type.
@@ -386,7 +480,7 @@ async def download_template(
 
 @router.get("/ingest/templates")
 async def list_templates(
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """
     List all available entity type templates with their column definitions.

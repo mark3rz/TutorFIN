@@ -15,7 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from auth import TokenUser, get_optional_user
+from auth import TokenUser, get_current_user
 from pipeline.schema_generator import (
     SCHEMA_OUTPUT_DIR,
     generate_and_save as generate_schema_and_save,
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/schema", tags=["schema"])
 
 
 @router.post("/generate")
-def generate_schema_endpoint(user: Optional[TokenUser] = Depends(get_optional_user)):
+def generate_schema_endpoint(user: TokenUser = Depends(get_current_user)):
     """Generate a PostgreSQL schema from the current entity registry."""
     try:
         schema = generate_schema_and_save()
@@ -37,7 +37,7 @@ def generate_schema_endpoint(user: Optional[TokenUser] = Depends(get_optional_us
 
 
 @router.get("")
-def get_schema(user: Optional[TokenUser] = Depends(get_optional_user)):
+def get_schema(user: TokenUser = Depends(get_current_user)):
     """Return the generated schema.json."""
     path = SCHEMA_OUTPUT_DIR / "schema.json"
     if not path.exists():
@@ -49,7 +49,7 @@ def get_schema(user: Optional[TokenUser] = Depends(get_optional_user)):
 
 
 @router.get("/sql")
-def get_schema_sql(user: Optional[TokenUser] = Depends(get_optional_user)):
+def get_schema_sql(user: TokenUser = Depends(get_current_user)):
     """Return the generated schema.sql DDL as plain text."""
     path = SCHEMA_OUTPUT_DIR / "schema.sql"
     if not path.exists():

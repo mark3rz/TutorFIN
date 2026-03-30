@@ -36,10 +36,20 @@ _engine: Engine | None = None
 def get_engine() -> Engine:
     """
     Get or create the SQLAlchemy engine with connection pooling.
-    Uses DATABASE_URL from config.
+    Uses DATABASE_URL from config. Supports SSL for managed databases.
     """
     global _engine
     if _engine is None:
+        # Build SSL connect_args based on DB_SSL_MODE config.
+        # sslmode=require is the right setting for Supabase, AWS RDS, and
+        # any other managed Postgres that enforces encrypted connections.
+        connect_args: dict = {}
+        ssl_mode = config.DB_SSL_MODE
+        if ssl_mode and ssl_mode != "disable":
+            # Only pass if not already embedded in the DATABASE_URL
+            if "sslmode=" not in config.DATABASE_URL:
+                connect_args["sslmode"] = ssl_mode
+
         _engine = create_engine(
             config.DATABASE_URL,
             poolclass=QueuePool,
@@ -48,6 +58,7 @@ def get_engine() -> Engine:
             pool_timeout=config.DB_POOL_TIMEOUT,
             pool_pre_ping=True,  # auto-reconnect on stale connections
             echo=config.DB_ECHO,
+            connect_args=connect_args,
         )
         logger.info(f"Database engine created: {_mask_url(config.DATABASE_URL)}")
     return _engine

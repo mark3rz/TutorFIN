@@ -2,6 +2,7 @@
 routes/ai.py — AI integration endpoints (embeddings, search, analytics).
 
 Endpoints:
+  GET  /ai/status   Feature availability flags (Voyage, Anthropic keys)
   POST /ai/embed    Generate vector embeddings for all entities
   POST /ai/search   Semantic search across entity data
   POST /ai/ask      Natural language SQL analytics
@@ -26,10 +27,29 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from auth import TokenUser, get_optional_user
+import config
+from auth import TokenUser, get_current_user
 from api import limiter
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+
+# ── Status ───────────────────────────────────────────────────────────────────
+
+@router.get("/status")
+def ai_status():
+    """
+    Return AI feature availability flags.
+
+    No auth required — used by the frontend to show/hide degradation banners.
+    Does NOT expose actual key values, only boolean availability.
+    """
+    return JSONResponse(content={
+        "anthropic_available": bool(config.ANTHROPIC_API_KEY),
+        "voyage_available": bool(config.VOYAGE_API_KEY),
+        "semantic_search_available": bool(config.VOYAGE_API_KEY),
+        "embedding_model": config.EMBEDDING_MODEL if config.VOYAGE_API_KEY else None,
+    })
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -46,7 +66,7 @@ async def _run_sync(fn, *args, **kwargs):
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.post("/embed")
-async def ai_embed(user: Optional[TokenUser] = Depends(get_optional_user)):
+async def ai_embed(user: TokenUser = Depends(get_current_user)):
     """Generate vector embeddings for all entities and store in PostgreSQL."""
     from pipeline.embeddings import embed_all_entities, setup_pgvector
 
@@ -77,7 +97,7 @@ async def ai_embed(user: Optional[TokenUser] = Depends(get_optional_user)):
 async def ai_search(
     request: Request,
     body: dict,
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """Semantic search across entity data using vector similarity.
 
@@ -95,7 +115,7 @@ async def ai_search(
     company_id = body.get("company_id")
 
     # Enforce company scoping for non-admin users
-    if user and not user.is_pe_admin and user.company_id:
+    if not user.is_pe_admin and user.company_id:
         company_id = user.company_id
 
     try:
@@ -129,7 +149,7 @@ async def ai_search(
 async def ai_ask(
     request: Request,
     body: dict,
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """Ask a business question in plain English.
 
@@ -145,7 +165,7 @@ async def ai_ask(
     company_id = body.get("company_id")
 
     # Enforce company scoping for non-admin users
-    if user and not user.is_pe_admin and user.company_id:
+    if not user.is_pe_admin and user.company_id:
         company_id = user.company_id
 
     try:

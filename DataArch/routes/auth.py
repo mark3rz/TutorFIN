@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy import text
 
+import config
 from services.audit import get_client_ip, log_action
 from auth import (
     TokenUser,
@@ -42,6 +43,9 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     full_name: str
+    # When invite_token is provided, role/company_id are taken from the invitation
+    # and any values supplied here are ignored.
+    invite_token: str | None = None
     role: str = UserRole.COMPANY_VIEWER
     company_id: int | None = None
 
@@ -81,28 +85,70 @@ def _user_row_to_dict(row) -> dict:
 def register(body: RegisterRequest, request: Request):
     """Create a new user account.
 
-    Initially open registration. Once invite flow ships (v0.8.1),
-    this will require a valid invite token or pe_admin role.
+    When OPEN_REGISTRATION=false (production default) an invite_token is required.
+    When a valid invite_token is supplied the role and company_id are taken
+    from the invitation and cannot be overridden by the request body.
     """
-    if body.role not in UserRole.ALL:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid role '{body.role}'. Allowed: {UserRole.ALL}",
-        )
-
     if len(body.password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
 
+    email = body.email.lower().strip()
     engine = get_engine()
+
+    # ── Invite-token path ──────────────────────────────────────────────────
+    invite_id: int | None = None
+    if body.invite_token:
+        with engine.connect() as conn:
+            invite = conn.execute(
+                text("""
+                    SELECT id, email, role, company_id, status, expires_at
+                    FROM invitations
+                    WHERE invite_token = :token
+                """),
+                {"token": body.invite_token},
+            ).fetchone()
+
+        if not invite:
+            raise HTTPException(status_code=400, detail="Invalid invitation token.")
+        if invite.status != "pending":
+            raise HTTPException(status_code=400, detail="This invitation has already been used or revoked.")
+        # Check expiry (naive datetime from DB → compare without tz)
+        now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+        if invite.expires_at < now_naive:
+            raise HTTPException(status_code=400, detail="This invitation link has expired.")
+        if invite.email.lower() != email:
+            raise HTTPException(
+                status_code=400,
+                detail="The email address does not match the invitation.",
+            )
+
+        # Override role/company from the invite — the inviter controls these
+        body.role = invite.role
+        body.company_id = invite.company_id
+        invite_id = invite.id
+
+    else:
+        # No invite token — only allowed when OPEN_REGISTRATION is enabled
+        if not config.OPEN_REGISTRATION:
+            raise HTTPException(
+                status_code=403,
+                detail="Registration requires an invitation. Contact your PE administrator.",
+            )
+        # Validate the role from the request body
+        if body.role not in UserRole.ALL:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid role '{body.role}'. Allowed: {UserRole.ALL}",
+            )
+
     pw_hash = hash_password(body.password)
 
     with engine.connect() as conn:
         # Check for existing user
         existing = conn.execute(
             text("SELECT id FROM users WHERE email = :email"),
-            {"email": body.email.lower().strip()},
+            {"email": email},
         ).fetchone()
-
         if existing:
             raise HTTPException(status_code=409, detail="A user with this email already exists.")
 
@@ -113,7 +159,7 @@ def register(body: RegisterRequest, request: Request):
                 RETURNING id, email, full_name, role, company_id, is_active, created_at
             """),
             {
-                "email": body.email.lower().strip(),
+                "email": email,
                 "pw_hash": pw_hash,
                 "full_name": body.full_name.strip(),
                 "role": body.role,
@@ -123,7 +169,20 @@ def register(body: RegisterRequest, request: Request):
         user = result.fetchone()
         conn.commit()
 
-    token = create_access_token(
+    # Mark the invitation as accepted
+    if invite_id is not None:
+        with engine.connect() as conn:
+            conn.execute(
+                text("""
+                    UPDATE invitations
+                    SET status = 'accepted', accepted_at = NOW()
+                    WHERE id = :iid
+                """),
+                {"iid": invite_id},
+            )
+            conn.commit()
+
+    jwt_token = create_access_token(
         user_id=user.id,
         email=user.email,
         role=user.role,
@@ -133,13 +192,17 @@ def register(body: RegisterRequest, request: Request):
     log_action(
         user_id=user.id, action="register",
         resource_type="user", resource_id=str(user.id),
-        details={"email": user.email, "role": user.role},
+        details={
+            "email": user.email,
+            "role": user.role,
+            "via_invite": invite_id is not None,
+        },
         ip_address=get_client_ip(request),
     )
 
     return {
         "user": _user_row_to_dict(user),
-        "token": token,
+        "token": jwt_token,
     }
 
 

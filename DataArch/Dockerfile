@@ -17,6 +17,8 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libpq-dev \
         gcc \
+        tesseract-ocr \
+        tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Install Python dependencies ──────────────────────────────

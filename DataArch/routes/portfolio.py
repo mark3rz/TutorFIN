@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from auth import TokenUser, get_optional_user
+from auth import TokenUser, get_current_user
 from pipeline.company import (
     CompanyCreate,
     CompanyUpdate,
@@ -38,7 +38,7 @@ router = APIRouter(tags=["portfolio"])
 @router.post("/companies")
 def create_company_endpoint(
     body: dict,
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """Create a new portfolio company."""
     name = body.get("name", "").strip()
@@ -68,7 +68,7 @@ def create_company_endpoint(
 @router.get("/companies")
 def list_companies_endpoint(
     status: Optional[str] = None,
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """List all portfolio companies. Optional: ?status=active"""
     try:
@@ -84,7 +84,7 @@ def list_companies_endpoint(
 @router.get("/companies/{company_id}")
 def get_company_endpoint(
     company_id: int,
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """Get a portfolio company by ID."""
     try:
@@ -102,7 +102,7 @@ def get_company_endpoint(
 def update_company_endpoint(
     company_id: int,
     body: dict,
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """Update an existing portfolio company."""
     try:
@@ -130,7 +130,7 @@ def update_company_endpoint(
 # ── Portfolio Intelligence ─────────────────────────────────────────────────
 
 @router.get("/portfolio/summary")
-def portfolio_summary(user: Optional[TokenUser] = Depends(get_optional_user)):
+def portfolio_summary(user: TokenUser = Depends(get_current_user)):
     """Aggregate metrics across all portfolio companies."""
     from pipeline.database import get_engine
 
@@ -191,7 +191,9 @@ def portfolio_summary(user: Optional[TokenUser] = Depends(get_optional_user)):
 @router.get("/portfolio/company/{company_id}/detail")
 def portfolio_company_detail(
     company_id: int,
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    offset: int = 0,
+    limit: int = 100,
+    user: TokenUser = Depends(get_current_user),
 ):
     """Entity breakdown for a single portfolio company."""
     from pipeline.database import get_engine
@@ -223,9 +225,10 @@ def portfolio_company_detail(
                         rows = conn.execute(
                             text(
                                 f"SELECT canonical_name, source_file FROM {quoted} "
-                                f"WHERE company_id = :cid ORDER BY canonical_name LIMIT 100"
+                                f"WHERE company_id = :cid ORDER BY canonical_name "
+                                f"LIMIT :lim OFFSET :off"
                             ),
-                            {"cid": company_id},
+                            {"cid": company_id, "lim": limit, "off": offset},
                         ).fetchall()
                         for row in rows:
                             entities.append({
@@ -241,6 +244,8 @@ def portfolio_company_detail(
             "entity_counts": entity_counts,
             "total_entities": sum(entity_counts.values()),
             "entities": entities,
+            "offset": offset,
+            "limit": limit,
         })
     except HTTPException:
         raise
@@ -251,7 +256,7 @@ def portfolio_company_detail(
 @router.get("/portfolio/vendor-overlap")
 def portfolio_vendor_overlap(
     min_companies: int = 2,
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """Find vendors that appear across multiple portfolio companies."""
     from pipeline.database import get_engine

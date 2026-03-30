@@ -56,7 +56,9 @@ services:
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
-      - ./outputs:/app/outputs
+      # Named volume keeps pipeline outputs across container rebuilds.
+      # To inspect outputs locally: docker cp dataarch-api:/app/outputs ./outputs
+      - dataarch-outputs:/app/outputs
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 15s
@@ -66,4 +68,6 @@ services:
 
 volumes:
   pgdata:
+    driver: local
+  dataarch-outputs:
     driver: local

@@ -2,7 +2,7 @@
 auth.py — Authentication & authorization for DataArch.AI.
 
 Provides:
-  - Password hashing (bcrypt via passlib)
+  - Password hashing (bcrypt directly — passlib skipped due to bcrypt>=4 incompatibility)
   - JWT token creation and validation (python-jose)
   - FastAPI dependencies for route protection
 
@@ -19,27 +19,30 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import bcrypt as _bcrypt
 from fastapi import Depends, HTTPException, Request, status
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy import text
 
 import config
 from models import UserRole
 
 # ── Password hashing ───────────────────────────────────────────────────────
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Uses bcrypt directly (bypasses passlib which has a version conflict with
+# bcrypt >= 4.x — passlib expects __about__.__version__ which no longer exists).
 
 
 def hash_password(plain: str) -> str:
-    """Hash a plaintext password."""
-    return pwd_context.hash(plain)
+    """Hash a plaintext password using bcrypt."""
+    return _bcrypt.hashpw(plain.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    """Verify a plaintext password against a hash."""
-    return pwd_context.verify(plain, hashed)
+    """Verify a plaintext password against a bcrypt hash."""
+    try:
+        return _bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
 
 
 # ── JWT Tokens ─────────────────────────────────────────────────────────────

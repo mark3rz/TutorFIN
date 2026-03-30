@@ -25,11 +25,17 @@ DATABASE_URL: str = os.getenv(
     "postgresql://dataarch:dataarch@localhost:5432/dataarch",
 )
 
-# Connection pool settings
+# Connection pool settings (tune these for managed DB connection limits)
 DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "5"))
 DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "10"))
 DB_POOL_TIMEOUT: int = int(os.getenv("DB_POOL_TIMEOUT", "30"))
 DB_ECHO: bool = os.getenv("DB_ECHO", "false").lower() in ("true", "1", "yes")
+
+# SSL mode for managed databases (e.g. Supabase, AWS RDS)
+# "prefer" — try SSL, fall back to plain (default, works for local dev)
+# "require" — enforce SSL (use in production)
+# "disable" — no SSL (never use in production)
+DB_SSL_MODE: str = os.getenv("DB_SSL_MODE", "prefer")
 
 # ── LLM ──────────────────────────────────────────────────────────────────────
 
@@ -45,7 +51,7 @@ EMBEDDING_DIMENSION: int = int(os.getenv("DATAARCH_EMBEDDING_DIM", "1024"))
 # ── Application ──────────────────────────────────────────────────────────────
 
 DATAARCH_ENV: str = os.getenv("DATAARCH_ENV", "dev")
-APP_VERSION: str = "0.9.5"
+APP_VERSION: str = "1.0.0-alpha"
 APP_NAME: str = "DataArch.AI"
 
 # ── Authentication ──────────────────────────────────────────────────────────
@@ -73,3 +79,20 @@ OUTPUTS_DIR: str = os.getenv("DATAARCH_OUTPUTS_DIR", "outputs")
 SCHEMA_OUTPUT_DIR: str = os.path.join(OUTPUTS_DIR, "schema")
 ONTOLOGY_OUTPUT_DIR: str = os.path.join(OUTPUTS_DIR, "ontology")
 DATAFLOW_OUTPUT_DIR: str = os.path.join(OUTPUTS_DIR, "dataflow")
+
+# ── Storage Backend ──────────────────────────────────────────────────────────
+# "local"  — write to OUTPUTS_DIR on the container filesystem (default)
+# "s3"     — write to S3_BUCKET (requires boto3 and AWS credentials)
+
+STORAGE_BACKEND: str = os.getenv("STORAGE_BACKEND", "local")
+S3_BUCKET: str = os.getenv("S3_BUCKET", "")
+S3_PREFIX: str = os.getenv("S3_PREFIX", "")
+AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
+
+# ── Invitations ──────────────────────────────────────────────────────────────
+
+OPEN_REGISTRATION: bool = os.getenv("OPEN_REGISTRATION", "true").lower() in ("true", "1", "yes")
+INVITE_EXPIRY_DAYS: int = int(os.getenv("INVITE_EXPIRY_DAYS", "7"))
+RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+FROM_EMAIL: str = os.getenv("FROM_EMAIL", "noreply@dataarch.ai")
+APP_URL: str = os.getenv("APP_URL", "http://localhost:8000")

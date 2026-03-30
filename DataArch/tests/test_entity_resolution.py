@@ -185,31 +185,40 @@ class TestEntityResolutionAPI:
         from api import app
         return TestClient(app)
 
-    def test_find_duplicates_missing_entity_type(self, client):
-        res = client.post("/entities/duplicates", json={})
+    @pytest.fixture
+    def auth_headers(self):
+        from auth import create_access_token
+        token = create_access_token(
+            user_id=1, email="test-admin@dataarch.ai",
+            role="pe_admin", company_id=None,
+        )
+        return {"Authorization": f"Bearer {token}"}
+
+    def test_find_duplicates_missing_entity_type(self, client, auth_headers):
+        res = client.post("/entities/duplicates", json={}, headers=auth_headers)
         assert res.status_code == 400
         assert "entity_type" in res.json()["detail"]
 
-    def test_merge_missing_fields(self, client):
-        res = client.post("/entities/merge", json={"source_id": 1})
+    def test_merge_missing_fields(self, client, auth_headers):
+        res = client.post("/entities/merge", json={"source_id": 1}, headers=auth_headers)
         assert res.status_code == 400
         assert "target_id" in res.json()["detail"] or "entity_type" in res.json()["detail"]
 
-    def test_merge_undo_missing_merge_id(self, client):
-        res = client.post("/entities/merge/undo", json={})
+    def test_merge_undo_missing_merge_id(self, client, auth_headers):
+        res = client.post("/entities/merge/undo", json={}, headers=auth_headers)
         assert res.status_code == 400
         assert "merge_id" in res.json()["detail"]
 
     @patch("pipeline.entity_resolution.get_engine")
     @patch("pipeline.entity_resolution.ensure_merge_history_table")
-    def test_find_duplicates_invalid_type_via_api(self, mock_ensure, mock_engine, client):
+    def test_find_duplicates_invalid_type_via_api(self, mock_ensure, mock_engine, client, auth_headers):
         mock_ensure.return_value = {"status": "ok"}
-        res = client.post("/entities/duplicates", json={"entity_type": "invalid"})
+        res = client.post("/entities/duplicates", json={"entity_type": "invalid"}, headers=auth_headers)
         assert res.status_code == 400
 
     @patch("pipeline.entity_resolution.get_engine")
-    def test_merge_invalid_entity_type_via_api(self, mock_engine, client):
+    def test_merge_invalid_entity_type_via_api(self, mock_engine, client, auth_headers):
         res = client.post("/entities/merge", json={
             "source_id": 1, "target_id": 2, "entity_type": "invalid",
-        })
+        }, headers=auth_headers)
         assert res.status_code == 400

@@ -337,8 +337,17 @@ class TestPortfolioAPI:
         from api import app
         return TestClient(app)
 
+    @pytest.fixture
+    def auth_headers(self):
+        from auth import create_access_token
+        token = create_access_token(
+            user_id=1, email="test-admin@dataarch.ai",
+            role="pe_admin", company_id=None,
+        )
+        return {"Authorization": f"Bearer {token}"}
+
     @patch("pipeline.database.get_engine")
-    def test_portfolio_summary_returns_structure(self, mock_engine, client):
+    def test_portfolio_summary_returns_structure(self, mock_engine, client, auth_headers):
         """Test that portfolio summary endpoint returns expected structure even with mock."""
         # Mock the engine and connection
         mock_conn = MagicMock()
@@ -351,20 +360,20 @@ class TestPortfolioAPI:
         mock_engine.return_value = mock_eng
 
         # Endpoint should handle errors gracefully or return error
-        res = client.get("/portfolio/summary")
+        res = client.get("/portfolio/summary", headers=auth_headers)
         # Either returns data or a 500 — both are valid depending on implementation
         assert res.status_code in (200, 500)
 
-    def test_vendor_overlap_endpoint_exists(self, client):
+    def test_vendor_overlap_endpoint_exists(self, client, auth_headers):
         """Test that vendor overlap endpoint responds."""
         # Will fail with DB error but endpoint exists
-        res = client.get("/portfolio/vendor-overlap")
+        res = client.get("/portfolio/vendor-overlap", headers=auth_headers)
         assert res.status_code in (200, 500)
 
     @patch("routes.portfolio.get_company")
-    def test_company_detail_not_found(self, mock_get, client):
+    def test_company_detail_not_found(self, mock_get, client, auth_headers):
         mock_get.return_value = None
-        res = client.get("/portfolio/company/999/detail")
+        res = client.get("/portfolio/company/999/detail", headers=auth_headers)
         assert res.status_code == 404
 
 

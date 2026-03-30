@@ -247,6 +247,37 @@ class AuditLog(Base):
     )
 
 
+# ── Invitations ───────────────────────────────────────────────────────────────
+
+class Invitation(Base):
+    """PE admin → user invite token.
+
+    Flow:
+      1. PE admin: POST /invites  → creates row, sends email with invite_token link
+      2. Invitee:  GET  /invites/accept/{token} → validates token, returns invite details
+      3. Invitee:  POST /auth/register with invite_token → creates account, marks accepted
+    """
+    __tablename__ = "invitations"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    email = Column(String(255), nullable=False)
+    role = Column(String(50), nullable=False, default=UserRole.COMPANY_VIEWER)
+    company_id = Column(BigInteger, ForeignKey("portfolio_company.id", ondelete="SET NULL"), nullable=True)
+    invite_token = Column(String(64), unique=True, nullable=False)
+    invited_by = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    status = Column(String(20), nullable=False, default="pending")  # pending | accepted | expired | revoked
+    expires_at = Column(DateTime, nullable=False)
+    accepted_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        Index("ix_invitations_email", "email"),
+        Index("ix_invitations_token", "invite_token"),
+        Index("ix_invitations_status", "status"),
+        Index("ix_invitations_company_id", "company_id"),
+    )
+
+
 # ── Portfolio Company (mirror of existing table for Alembic awareness) ────────
 # NOTE: This table already exists in production, created by pipeline/company.py.
 # We define it here so Alembic can track it, but the initial migration will NOT

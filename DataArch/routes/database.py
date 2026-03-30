@@ -17,7 +17,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
-from auth import TokenUser, get_optional_user, require_role
+from auth import TokenUser, get_current_user, require_role
 from models import UserRole
 
 router = APIRouter(prefix="/database", tags=["database"])
@@ -32,7 +32,7 @@ def database_health():
 
 
 @router.post("/create")
-def database_create(user: Optional[TokenUser] = Depends(get_optional_user)):
+def database_create(user: TokenUser = Depends(get_current_user)):
     """Execute the generated DDL against the PostgreSQL database."""
     from pipeline.database import execute_schema, load_schema_from_file
 
@@ -49,7 +49,7 @@ def database_create(user: Optional[TokenUser] = Depends(get_optional_user)):
 
 
 @router.post("/load")
-def database_load(user: Optional[TokenUser] = Depends(get_optional_user)):
+def database_load(user: TokenUser = Depends(get_current_user)):
     """Load entity registry data into the PostgreSQL database."""
     from pipeline.data_loader import load_from_files
 
@@ -94,7 +94,7 @@ def database_reset(
 
 
 @router.get("/stats")
-def database_stats(user: Optional[TokenUser] = Depends(get_optional_user)):
+def database_stats(user: TokenUser = Depends(get_current_user)):
     """Get row counts and table sizes for all DataArch tables."""
     from pipeline.database import get_table_stats
 
@@ -106,7 +106,7 @@ def database_stats(user: Optional[TokenUser] = Depends(get_optional_user)):
 
 
 @router.post("/query")
-def database_query(body: dict, user: Optional[TokenUser] = Depends(get_optional_user)):
+def database_query(body: dict, user: TokenUser = Depends(get_current_user)):
     """Execute a read-only SQL query against the database.
 
     Only SELECT and WITH (CTE) queries are allowed.

@@ -85,6 +85,7 @@ app.add_middleware(
 
 from routes.auth import router as auth_router
 from routes.ingest import router as ingest_router
+from routes.invites import router as invites_router
 from routes.ontology import router as ontology_router
 from routes.schema import router as schema_router
 from routes.dataflow import router as dataflow_router
@@ -96,6 +97,7 @@ from routes.admin import router as admin_router
 
 app.include_router(auth_router)
 app.include_router(ingest_router)
+app.include_router(invites_router)
 app.include_router(ontology_router)
 app.include_router(schema_router)
 app.include_router(dataflow_router)
@@ -119,6 +121,19 @@ def root():
     if index_path.exists():
         return HTMLResponse(content=index_path.read_text())
     return HTMLResponse(content="<h1>DataArch.AI</h1><p>Frontend not found.</p>")
+
+
+@app.get("/invite/{token}", response_class=HTMLResponse)
+def invite_page(token: str):
+    """Serve the invite acceptance SPA page.
+
+    The frontend JS reads the token from the URL path and calls
+    GET /invites/accept/{token} to validate and prefill the registration form.
+    """
+    index_path = FRONTEND_DIR / "index.html"
+    if index_path.exists():
+        return HTMLResponse(content=index_path.read_text())
+    return HTMLResponse(content="<h1>DataArch.AI — Invite</h1><p>Frontend not found.</p>")
 
 
 @app.get("/health")

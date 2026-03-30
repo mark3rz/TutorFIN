@@ -218,13 +218,13 @@ from api import app
 client = TestClient(app)
 
 
-def test_ai_search_missing_query():
-    response = client.post("/ai/search", json={})
+def test_ai_search_missing_query(auth_headers):
+    response = client.post("/ai/search", json={}, headers=auth_headers)
     assert response.status_code == 400
     assert "query" in response.json()["detail"].lower()
 
 
-def test_ai_ask_missing_question():
-    response = client.post("/ai/ask", json={})
+def test_ai_ask_missing_question(auth_headers):
+    response = client.post("/ai/ask", json={}, headers=auth_headers)
     assert response.status_code == 400
     assert "question" in response.json()["detail"].lower()

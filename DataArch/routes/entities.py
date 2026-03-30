@@ -15,13 +15,13 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
-from auth import TokenUser, get_optional_user
+from auth import TokenUser, get_current_user
 
 router = APIRouter(prefix="/entities", tags=["entities"])
 
 
 @router.post("/duplicates")
-def find_duplicates(body: dict, user: Optional[TokenUser] = Depends(get_optional_user)):
+def find_duplicates(body: dict, user: TokenUser = Depends(get_current_user)):
     """Find potential duplicate entities using embedding cosine similarity."""
     from pipeline.entity_resolution import ensure_merge_history_table, find_duplicate_candidates
 
@@ -51,7 +51,7 @@ def find_duplicates(body: dict, user: Optional[TokenUser] = Depends(get_optional
 
 
 @router.post("/merge")
-def merge_entity_pair(body: dict, user: Optional[TokenUser] = Depends(get_optional_user)):
+def merge_entity_pair(body: dict, user: TokenUser = Depends(get_current_user)):
     """Merge source entity into target entity (source is absorbed/deleted)."""
     from pipeline.entity_resolution import ensure_merge_history_table, merge_entities
 
@@ -77,7 +77,7 @@ def merge_entity_pair(body: dict, user: Optional[TokenUser] = Depends(get_option
 
 
 @router.post("/merge/undo")
-def undo_entity_merge(body: dict, user: Optional[TokenUser] = Depends(get_optional_user)):
+def undo_entity_merge(body: dict, user: TokenUser = Depends(get_current_user)):
     """Undo a previous merge by restoring the deleted entity from its snapshot."""
     from pipeline.entity_resolution import undo_merge
 
@@ -97,14 +97,23 @@ def undo_entity_merge(body: dict, user: Optional[TokenUser] = Depends(get_option
 @router.get("/merge/history")
 def merge_history(
     entity_type: str | None = None,
+    offset: int = 0,
     limit: int = 50,
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
-    """List merge operations, newest first."""
+    """List merge operations, newest first, with pagination."""
     from pipeline.entity_resolution import get_merge_history
 
     try:
-        entries = get_merge_history(entity_type=entity_type, limit=limit)
-        return JSONResponse(content={"entries": entries, "count": len(entries)})
+        # Fetch enough to support offset + limit then slice in Python
+        all_entries = get_merge_history(entity_type=entity_type, limit=offset + limit)
+        page = all_entries[offset : offset + limit]
+        return JSONResponse(content={
+            "entries": page,
+            "count": len(page),
+            "total": len(all_entries),
+            "offset": offset,
+            "limit": limit,
+        })
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch history: {e}")

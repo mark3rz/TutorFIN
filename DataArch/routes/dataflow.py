@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from auth import TokenUser, get_optional_user
+from auth import TokenUser, get_current_user
 from pipeline.dataflow import (
     DATAFLOW_OUTPUT_DIR,
     generate_and_save as generate_dataflow_and_save,
@@ -28,7 +28,7 @@ FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
 
 @router.post("/generate")
-def generate_dataflow_endpoint(user: Optional[TokenUser] = Depends(get_optional_user)):
+def generate_dataflow_endpoint(user: TokenUser = Depends(get_current_user)):
     """Generate the data flow graph from the entity registry and schema."""
     try:
         graph = generate_dataflow_and_save()
@@ -40,7 +40,7 @@ def generate_dataflow_endpoint(user: Optional[TokenUser] = Depends(get_optional_
 
 
 @router.get("")
-def get_dataflow(user: Optional[TokenUser] = Depends(get_optional_user)):
+def get_dataflow(user: TokenUser = Depends(get_current_user)):
     """Return the generated data flow graph JSON."""
     path = DATAFLOW_OUTPUT_DIR / "dataflow.json"
     if not path.exists():

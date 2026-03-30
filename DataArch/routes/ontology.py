@@ -17,7 +17,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
-from auth import TokenUser, get_optional_user
+from auth import TokenUser, get_current_user
 from pipeline.ontology.mapper import map_all_outputs, map_from_parsed_json
 
 router = APIRouter(prefix="/ontology", tags=["ontology"])
@@ -29,7 +29,7 @@ ONTOLOGY_DIR = Path("outputs/ontology")
 @router.post("/map/{document_id}")
 def map_ontology(
     document_id: str,
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """Run the ontology mapper on a previously parsed document."""
     parsed_path = OUTPUTS_DIR / f"{document_id}.json"
@@ -46,7 +46,7 @@ def map_ontology(
 
 
 @router.post("/map-all")
-def map_all(user: Optional[TokenUser] = Depends(get_optional_user)):
+def map_all(user: TokenUser = Depends(get_current_user)):
     """Run the ontology mapper across all parsed documents."""
     try:
         results = map_all_outputs()
@@ -56,7 +56,7 @@ def map_all(user: Optional[TokenUser] = Depends(get_optional_user)):
 
 
 @router.get("/registry")
-def get_registry(user: Optional[TokenUser] = Depends(get_optional_user)):
+def get_registry(user: TokenUser = Depends(get_current_user)):
     """Return the full entity registry (all unique canonical entities)."""
     registry_path = ONTOLOGY_DIR / "entity_registry.json"
     if not registry_path.exists():
@@ -67,7 +67,7 @@ def get_registry(user: Optional[TokenUser] = Depends(get_optional_user)):
 @router.get("/{document_id}")
 def get_ontology_result(
     document_id: str,
-    user: Optional[TokenUser] = Depends(get_optional_user),
+    user: TokenUser = Depends(get_current_user),
 ):
     """Fetch the ontology mapping result for a specific document."""
     path = ONTOLOGY_DIR / f"{document_id}_ontology.json"

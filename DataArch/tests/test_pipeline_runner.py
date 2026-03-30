@@ -247,26 +247,27 @@ from api import app
 client = TestClient(app)
 
 
-def test_pipeline_status_not_found():
+def test_pipeline_status_not_found(auth_headers):
     """GET /pipeline/status/{id} returns 404 for unknown job."""
-    res = client.get("/pipeline/status/nonexistent")
+    res = client.get("/pipeline/status/nonexistent", headers=auth_headers)
     assert res.status_code == 404
 
 
-def test_pipeline_jobs_empty():
+def test_pipeline_jobs_empty(auth_headers):
     """GET /pipeline/jobs returns empty list initially."""
-    res = client.get("/pipeline/jobs")
+    res = client.get("/pipeline/jobs", headers=auth_headers)
     assert res.status_code == 200
     data = res.json()
     assert "jobs" in data
     assert isinstance(data["jobs"], list)
 
 
-def test_pipeline_run_unsupported_type():
+def test_pipeline_run_unsupported_type(auth_headers):
     """POST /pipeline/run rejects unsupported file types."""
     from io import BytesIO
     res = client.post(
         "/pipeline/run",
         files={"file": ("test.exe", BytesIO(b"binary"), "application/octet-stream")},
+        headers=auth_headers,
     )
     assert res.status_code == 415
