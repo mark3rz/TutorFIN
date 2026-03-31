@@ -93,6 +93,10 @@ def map_document(
             confidence = confidence_from_str(result.get("confidence", "low"))
             canonical_name = result.get("canonical_name") or entity.name or "unnamed"
 
+            # Preserve original LLM extraction confidence (0.0-1.0) for dashboard
+            attributes_with_confidence = result.get("attributes", {}).copy()
+            attributes_with_confidence["_extraction_confidence"] = entity.confidence
+
             record = OntologyRecord(
                 id=_make_id(doc.metadata.filename, canonical_name, ont_type.value,
                             company_slug=company_slug),
@@ -103,7 +107,7 @@ def map_document(
                 source_file=doc.metadata.filename,
                 source_entity_type=entity.entity_type,
                 source_attributes=entity.attributes,
-                attributes=result.get("attributes", {}),
+                attributes=attributes_with_confidence,
                 mapping_notes=result.get("mapping_notes", ""),
                 company_slug=company_slug,
             )

@@ -1458,3 +1458,22 @@ a:hover { text-decoration: underline; }
     margin-left: 60px;
   }
 }
+
+/* ── Metric Card (Confidence Dashboard) ────────────────────────────────────── */
+.da-metric-card {
+  background: var(--da-bg-3);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+.da-metric-label {
+  font-size: 11px;
+  color: var(--da-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.da-metric-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--da-text-1);
+}

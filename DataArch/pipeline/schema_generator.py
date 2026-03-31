@@ -316,6 +316,7 @@ def generate_schema(registry: EntityRegistry) -> dict:
         # Add standard audit columns
         columns.extend([
             {"name": "source_file", "type": "VARCHAR(500)", "nullable": True, "primary_key": False},
+            {"name": "extraction_confidence", "type": "DECIMAL(3,2)", "nullable": True, "primary_key": False},
             {"name": "created_at", "type": "TIMESTAMP", "nullable": False, "primary_key": False,
              "default": "NOW()"},
             {"name": "updated_at", "type": "TIMESTAMP", "nullable": False, "primary_key": False,

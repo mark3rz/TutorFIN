@@ -96,6 +96,16 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
         <span>Portfolio</span>
       </button>
+      <button class="da-nav-item" data-page="confidence" id="nav-confidence">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <span>Data Quality</span>
+      </button>
+
+      <div class="da-nav-section-label" style="margin-top:8px">Admin</div>
+      <button class="da-nav-item" data-page="ontology-admin" id="nav-ontology-admin" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span>Ontology Admin</span>
+      </button>
     </nav>
 
     <div class="da-sidebar-footer">
@@ -410,6 +420,112 @@
       </div>
     </section>
 
+    <!-- ════════════════ VIEW: Ontology Admin ════════════════ -->
+    <section class="da-view" id="view-ontology-admin">
+      <div class="da-page-header">
+        <div class="da-h2">Ontology Administration</div>
+        <div class="da-subtitle">Manage entity types, attributes, and foreign key relationships</div>
+      </div>
+
+      <!-- Entity Types Section -->
+      <div class="da-card da-mb-16">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div class="da-card-title" style="margin:0;">Entity Types</div>
+          <div style="display:flex;gap:8px;">
+            <button class="da-btn da-btn-ghost da-btn-sm" onclick="refreshOntologyCache()">🔄 Refresh Cache</button>
+            <button class="da-btn da-btn-primary da-btn-sm" onclick="openAddTypeModal()">+ Add Entity Type</button>
+          </div>
+        </div>
+        <div id="ontology-types-table" style="overflow-x:auto;">
+          <div class="da-empty"><div class="da-spinner" style="margin:0 auto 12px;"></div><p>Loading entity types...</p></div>
+        </div>
+      </div>
+
+      <!-- FK Rules Section -->
+      <div class="da-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div class="da-card-title" style="margin:0;">Foreign Key Rules</div>
+          <button class="da-btn da-btn-primary da-btn-sm" onclick="openAddFkRuleModal()">+ Add FK Rule</button>
+        </div>
+        <div id="ontology-fk-rules-table" style="overflow-x:auto;">
+          <div class="da-empty"><div class="da-spinner" style="margin:0 auto 12px;"></div><p>Loading FK rules...</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="da-view" id="view-confidence">
+      <div class="da-page-header">
+        <div class="da-h2">Data Quality Dashboard</div>
+        <div class="da-subtitle">Extraction confidence metrics across entities and companies</div>
+      </div>
+
+      <!-- Portfolio-wide summary (pe_admin only) -->
+      <div class="da-card da-mb-16" id="confidence-portfolio-card" style="display:none;">
+        <div class="da-card-title">Portfolio Confidence Overview</div>
+        <div id="confidence-portfolio-summary">
+          <div class="da-empty"><div class="da-spinner" style="margin:0 auto 12px;"></div><p>Loading portfolio confidence...</p></div>
+        </div>
+      </div>
+
+      <!-- Company selector for pe_admin, auto for company users -->
+      <div class="da-card da-mb-16" id="confidence-company-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div class="da-card-title" style="margin:0;">Company Confidence Breakdown</div>
+          <select id="confidence-company-select" class="da-select" style="width:220px;" onchange="loadCompanyConfidence()">
+            <option value="">Select company...</option>
+          </select>
+        </div>
+
+        <!-- Summary metrics row -->
+        <div id="confidence-summary-metrics" style="display:none;margin-bottom:20px;">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+            <div class="da-metric-card">
+              <div class="da-metric-label">Total Entities</div>
+              <div class="da-metric-value" id="conf-total">—</div>
+            </div>
+            <div class="da-metric-card" style="border-left:3px solid #22c55e;">
+              <div class="da-metric-label">High Confidence</div>
+              <div class="da-metric-value" style="color:#22c55e;" id="conf-high">—</div>
+            </div>
+            <div class="da-metric-card" style="border-left:3px solid #f59e0b;">
+              <div class="da-metric-label">Medium Confidence</div>
+              <div class="da-metric-value" style="color:#f59e0b;" id="conf-medium">—</div>
+            </div>
+            <div class="da-metric-card" style="border-left:3px solid #ef4444;">
+              <div class="da-metric-label">Low Confidence</div>
+              <div class="da-metric-value" style="color:#ef4444;" id="conf-low">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Confidence bar visualization -->
+        <div id="confidence-bar-container" style="display:none;margin-bottom:20px;">
+          <div style="font-size:12px;color:var(--da-text-3);margin-bottom:6px;">Confidence Distribution</div>
+          <div id="confidence-bar" style="display:flex;height:24px;border-radius:6px;overflow:hidden;background:var(--da-bg-3);"></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--da-text-3);margin-top:4px;">
+            <span>Avg: <strong id="conf-avg">—</strong></span>
+            <span>≥0.8 High | 0.5–0.8 Medium | &lt;0.5 Low</span>
+          </div>
+        </div>
+
+        <!-- Per entity type table -->
+        <div id="confidence-by-type-table">
+          <div class="da-empty"><p>Select a company to view confidence metrics.</p></div>
+        </div>
+      </div>
+
+      <!-- Low confidence entities drill-down -->
+      <div class="da-card" id="confidence-low-card" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div class="da-card-title" style="margin:0;">Low Confidence Entities (&lt; 0.5)</div>
+          <button class="da-btn da-btn-ghost da-btn-sm" onclick="loadLowConfidenceEntities()">Refresh</button>
+        </div>
+        <div id="confidence-low-table">
+          <div class="da-empty"><p>Process data through the pipeline to see confidence metrics.</p></div>
+        </div>
+      </div>
+    </section>
+
   </div><!-- /.da-main -->
 </div><!-- /.da-app -->
 
@@ -450,6 +566,143 @@
         <button class="da-btn da-btn-primary" id="excel-modal-confirm" onclick="confirmExcelAndRun()">
           Run Pipeline on Selected Sheets
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ Ontology Type Add/Edit Modal ══════════ -->
+<div id="ontology-type-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:var(--da-bg-2);border:1px solid var(--da-border);border-radius:12px;width:100%;max-width:540px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.35);">
+    <div style="padding:20px 24px 16px;border-bottom:1px solid var(--da-border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:16px;font-weight:700;color:var(--da-text-1);" id="ontology-type-modal-title">Add Entity Type</div>
+        <button onclick="closeOntologyTypeModal()" style="background:none;border:none;cursor:pointer;color:var(--da-text-3);padding:4px;line-height:0;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div style="padding:24px;">
+      <div style="margin-bottom:14px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">Name (slug)</label>
+        <input type="text" id="ontology-type-name" class="da-input" placeholder="vendor" style="width:100%;">
+        <div style="font-size:11px;color:var(--da-text-3);margin-top:4px;">Lowercase, no spaces (e.g., vendor, customer, employee)</div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">Display Label</label>
+        <input type="text" id="ontology-type-display-label" class="da-input" placeholder="Vendor" style="width:100%;">
+      </div>
+      <div style="margin-bottom:14px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">Color</label>
+        <input type="color" id="ontology-type-color" class="da-input" value="#6b6b7a" style="width:100%;height:48px;">
+      </div>
+      <div style="margin-bottom:14px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">Icon (emoji or symbol)</label>
+        <input type="text" id="ontology-type-icon" class="da-input" placeholder="🏢" style="width:100%;">
+      </div>
+      <div style="margin-bottom:14px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">Description</label>
+        <textarea id="ontology-type-description" class="da-textarea" rows="2" placeholder="Optional description..." style="width:100%;"></textarea>
+      </div>
+      <div style="margin-bottom:14px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">Classification Examples</label>
+        <textarea id="ontology-type-examples" class="da-textarea" rows="2" placeholder="Examples for AI classification..." style="width:100%;"></textarea>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:14px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+          <input type="checkbox" id="ontology-type-is-entity-table" checked>
+          Is Entity Table
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+          <input type="checkbox" id="ontology-type-is-resolvable" checked>
+          Is Resolvable
+        </label>
+      </div>
+      <div style="margin-bottom:20px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">Sort Order</label>
+        <input type="number" id="ontology-type-sort-order" class="da-input" value="0" style="width:100%;">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="da-btn da-btn-ghost" onclick="closeOntologyTypeModal()">Cancel</button>
+        <button class="da-btn da-btn-primary" id="ontology-type-submit-btn" onclick="submitOntologyType()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ FK Rule Add Modal ══════════ -->
+<div id="ontology-fk-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:var(--da-bg-2);border:1px solid var(--da-border);border-radius:12px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.35);">
+    <div style="padding:20px 24px 16px;border-bottom:1px solid var(--da-border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:16px;font-weight:700;color:var(--da-text-1);">Add FK Rule</div>
+        <button onclick="closeOntologyFkModal()" style="background:none;border:none;cursor:pointer;color:var(--da-text-3);padding:4px;line-height:0;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div style="padding:24px;">
+      <div style="margin-bottom:14px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">Child Type</label>
+        <select id="ontology-fk-child-type" class="da-select" style="width:100%;">
+          <option value="">Select child type...</option>
+        </select>
+      </div>
+      <div style="margin-bottom:14px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">Parent Type</label>
+        <select id="ontology-fk-parent-type" class="da-select" style="width:100%;">
+          <option value="">Select parent type...</option>
+        </select>
+      </div>
+      <div style="margin-bottom:20px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">Column Name</label>
+        <input type="text" id="ontology-fk-column" class="da-input" placeholder="e.g., vendor_id" style="width:100%;">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="da-btn da-btn-ghost" onclick="closeOntologyFkModal()">Cancel</button>
+        <button class="da-btn da-btn-primary" onclick="submitOntologyFkRule()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ Add Attribute Modal ══════════ -->
+<div id="ontology-attr-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:var(--da-bg-2);border:1px solid var(--da-border);border-radius:12px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.35);">
+    <div style="padding:20px 24px 16px;border-bottom:1px solid var(--da-border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:16px;font-weight:700;color:var(--da-text-1);">Add Attribute</div>
+        <button onclick="closeOntologyAttrModal()" style="background:none;border:none;cursor:pointer;color:var(--da-text-3);padding:4px;line-height:0;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div style="padding:24px;">
+      <div style="margin-bottom:14px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">Attribute Name</label>
+        <input type="text" id="ontology-attr-name" class="da-input" placeholder="e.g., tax_id" style="width:100%;">
+      </div>
+      <div style="margin-bottom:14px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">Description</label>
+        <textarea id="ontology-attr-description" class="da-textarea" rows="2" placeholder="Optional description..." style="width:100%;"></textarea>
+      </div>
+      <div style="margin-bottom:14px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">SQL Type Hint</label>
+        <input type="text" id="ontology-attr-sql-type" class="da-input" placeholder="e.g., VARCHAR(50)" style="width:100%;">
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:14px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+          <input type="checkbox" id="ontology-attr-is-key">
+          Is Key Attribute
+        </label>
+      </div>
+      <div style="margin-bottom:20px;">
+        <label class="da-label" style="display:block;margin-bottom:6px;">Sort Order</label>
+        <input type="number" id="ontology-attr-sort-order" class="da-input" value="0" style="width:100%;">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="da-btn da-btn-ghost" onclick="closeOntologyAttrModal()">Cancel</button>
+        <button class="da-btn da-btn-primary" onclick="submitOntologyAttribute()">Add Attribute</button>
       </div>
     </div>
   </div>
@@ -604,6 +857,12 @@ function enterApp() {
     // Role-based UI visibility
     const role = currentUser.role || "";
 
+    // Show Ontology Admin nav only for pe_admin
+    if (role === "pe_admin") {
+      const ontologyAdminNav = document.getElementById("nav-ontology-admin");
+      if (ontologyAdminNav) ontologyAdminNav.style.display = "flex";
+    }
+
     // Hide Database nav for company_admin and company_viewer
     if (role === "company_admin" || role === "company_viewer") {
       const dbNav = document.querySelector('[data-page="database"]');
@@ -671,6 +930,8 @@ document.querySelectorAll(".da-nav-item").forEach(item => {
     if (item.dataset.page === "portfolio") loadPortfolio();
     if (item.dataset.page === "ai") { loadCompanySelectors(); checkAIStatus(); }
     if (item.dataset.page === "documents") loadDocuments();
+    if (item.dataset.page === "confidence") loadConfidenceDashboard();
+    if (item.dataset.page === "ontology-admin") loadOntologyAdmin();
   });
 });
 
@@ -1872,6 +2133,594 @@ async function submitInviteRegistration(e) {
     errBox.style.display = "flex";
     btn.disabled = false;
     btn.textContent = "Create Account";
+  }
+}
+
+// ── Confidence Dashboard ────────────────────────────────────────────────────
+async function loadConfidenceDashboard() {
+  const user = JSON.parse(localStorage.getItem("da_user") || "{}");
+  const role = user.role || "";
+  const companyId = user.company_id;
+
+  // Load company selector
+  const select = document.getElementById("confidence-company-select");
+  if (role === "pe_admin") {
+    // Show portfolio card and load companies
+    document.getElementById("confidence-portfolio-card").style.display = "block";
+    loadPortfolioConfidence();
+    try {
+      const res = await fetch(`${API}/companies`);
+      const data = await res.json();
+      select.innerHTML = '<option value="">Select company...</option>';
+      (data.companies || []).forEach(c => {
+        select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+      });
+    } catch (e) {
+      console.error("Failed to load companies for confidence:", e);
+    }
+  } else {
+    // Company user: auto-select their company
+    document.getElementById("confidence-portfolio-card").style.display = "none";
+    select.innerHTML = `<option value="${companyId}">My Company</option>`;
+    select.value = companyId;
+    loadCompanyConfidence();
+  }
+}
+
+async function loadPortfolioConfidence() {
+  const container = document.getElementById("confidence-portfolio-summary");
+  try {
+    const res = await fetch(`${API}/confidence/portfolio`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      container.innerHTML = '<div class="da-empty"><p>Failed to load portfolio confidence</p></div>';
+      return;
+    }
+
+    const p = data.portfolio;
+    let html = '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;">';
+    html += `<div class="da-metric-card"><div class="da-metric-label">Total Entities</div><div class="da-metric-value">${p.total_entities.toLocaleString()}</div></div>`;
+    html += `<div class="da-metric-card"><div class="da-metric-label">Avg Confidence</div><div class="da-metric-value">${(p.avg_confidence * 100).toFixed(0)}%</div></div>`;
+    html += `<div class="da-metric-card" style="border-left:3px solid #22c55e;"><div class="da-metric-label">High</div><div class="da-metric-value" style="color:#22c55e;">${p.high.toLocaleString()}</div></div>`;
+    html += `<div class="da-metric-card" style="border-left:3px solid #f59e0b;"><div class="da-metric-label">Medium</div><div class="da-metric-value" style="color:#f59e0b;">${p.medium.toLocaleString()}</div></div>`;
+    html += `<div class="da-metric-card" style="border-left:3px solid #ef4444;"><div class="da-metric-label">Low</div><div class="da-metric-value" style="color:#ef4444;">${p.low.toLocaleString()}</div></div>`;
+    html += '</div>';
+
+    // Company breakdown table
+    if (data.by_company && data.by_company.length > 0) {
+      html += '<table class="da-table"><thead><tr><th>Company</th><th>Entities</th><th>Avg</th><th>High</th><th>Medium</th><th>Low</th></tr></thead><tbody>';
+      data.by_company.forEach(c => {
+        html += `<tr><td><strong>${c.company_name}</strong></td><td>${c.total_entities}</td><td>${(c.avg_confidence * 100).toFixed(0)}%</td>`;
+        html += `<td style="color:#22c55e;">${c.high}</td><td style="color:#f59e0b;">${c.medium}</td><td style="color:#ef4444;">${c.low}</td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+
+    container.innerHTML = html;
+  } catch (e) {
+    console.error("Failed to load portfolio confidence:", e);
+    container.innerHTML = '<div class="da-empty"><p>Error loading portfolio confidence</p></div>';
+  }
+}
+
+async function loadCompanyConfidence() {
+  const companyId = document.getElementById("confidence-company-select").value;
+  if (!companyId) return;
+
+  const metricsDiv = document.getElementById("confidence-summary-metrics");
+  const barDiv = document.getElementById("confidence-bar-container");
+  const typeTable = document.getElementById("confidence-by-type-table");
+  const lowCard = document.getElementById("confidence-low-card");
+
+  typeTable.innerHTML = '<div class="da-empty"><div class="da-spinner" style="margin:0 auto 12px;"></div><p>Loading confidence data...</p></div>';
+
+  try {
+    const res = await fetch(`${API}/confidence/company/${companyId}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      typeTable.innerHTML = `<div class="da-empty"><p>${data.detail || "Failed to load confidence data"}</p></div>`;
+      metricsDiv.style.display = "none";
+      barDiv.style.display = "none";
+      lowCard.style.display = "none";
+      return;
+    }
+
+    const s = data.summary;
+
+    // Update metrics
+    metricsDiv.style.display = "block";
+    document.getElementById("conf-total").textContent = s.total_entities.toLocaleString();
+    document.getElementById("conf-high").textContent = s.high.toLocaleString();
+    document.getElementById("conf-medium").textContent = s.medium.toLocaleString();
+    document.getElementById("conf-low").textContent = s.low.toLocaleString();
+    document.getElementById("conf-avg").textContent = `${(s.avg_confidence * 100).toFixed(0)}%`;
+
+    // Confidence bar
+    barDiv.style.display = "block";
+    const total = s.total_entities || 1;
+    const bar = document.getElementById("confidence-bar");
+    bar.innerHTML = '';
+    if (s.high > 0) bar.innerHTML += `<div style="width:${(s.high/total*100).toFixed(1)}%;background:#22c55e;" title="High: ${s.high}"></div>`;
+    if (s.medium > 0) bar.innerHTML += `<div style="width:${(s.medium/total*100).toFixed(1)}%;background:#f59e0b;" title="Medium: ${s.medium}"></div>`;
+    if (s.low > 0) bar.innerHTML += `<div style="width:${(s.low/total*100).toFixed(1)}%;background:#ef4444;" title="Low: ${s.low}"></div>`;
+
+    // Per entity type table
+    if (data.by_entity_type && data.by_entity_type.length > 0) {
+      let html = '<table class="da-table"><thead><tr><th>Entity Type</th><th>Count</th><th>Avg Confidence</th><th>High</th><th>Medium</th><th>Low</th><th>Distribution</th></tr></thead><tbody>';
+      data.by_entity_type.forEach(t => {
+        const tTotal = t.total || 1;
+        html += `<tr><td><strong>${t.entity_type}</strong></td><td>${t.total}</td><td>${(t.avg_confidence * 100).toFixed(0)}%</td>`;
+        html += `<td style="color:#22c55e;">${t.high}</td><td style="color:#f59e0b;">${t.medium}</td><td style="color:#ef4444;">${t.low}</td>`;
+        html += `<td><div style="display:flex;height:12px;border-radius:3px;overflow:hidden;background:var(--da-bg-3);min-width:100px;">`;
+        if (t.high > 0) html += `<div style="width:${(t.high/tTotal*100).toFixed(1)}%;background:#22c55e;"></div>`;
+        if (t.medium > 0) html += `<div style="width:${(t.medium/tTotal*100).toFixed(1)}%;background:#f59e0b;"></div>`;
+        if (t.low > 0) html += `<div style="width:${(t.low/tTotal*100).toFixed(1)}%;background:#ef4444;"></div>`;
+        html += `</div></td></tr>`;
+      });
+      html += '</tbody></table>';
+      typeTable.innerHTML = html;
+    } else {
+      typeTable.innerHTML = '<div class="da-empty"><p>No entities with confidence data found. Process documents to populate.</p></div>';
+    }
+
+    // Show low confidence card if there are any
+    if (s.low > 0) {
+      lowCard.style.display = "block";
+      loadLowConfidenceEntities();
+    } else {
+      lowCard.style.display = "none";
+    }
+
+  } catch (e) {
+    console.error("Failed to load company confidence:", e);
+    typeTable.innerHTML = '<div class="da-empty"><p>Error loading confidence data</p></div>';
+  }
+}
+
+async function loadLowConfidenceEntities() {
+  const companyId = document.getElementById("confidence-company-select").value;
+  if (!companyId) return;
+
+  const container = document.getElementById("confidence-low-table");
+  container.innerHTML = '<div class="da-empty"><div class="da-spinner" style="margin:0 auto 12px;"></div><p>Loading low confidence entities...</p></div>';
+
+  try {
+    const res = await fetch(`${API}/confidence/company/${companyId}/low?limit=25`);
+    const data = await res.json();
+
+    if (!res.ok || !data.entities || data.entities.length === 0) {
+      container.innerHTML = '<div class="da-empty"><p>No low-confidence entities found.</p></div>';
+      return;
+    }
+
+    let html = `<div style="font-size:12px;color:var(--da-text-3);margin-bottom:8px;">${data.total_low_confidence} entities below 0.5 confidence</div>`;
+    html += '<table class="da-table"><thead><tr><th>Entity Type</th><th>Name</th><th>Confidence</th><th>Source File</th></tr></thead><tbody>';
+    data.entities.forEach(e => {
+      const pct = e.extraction_confidence != null ? (e.extraction_confidence * 100).toFixed(0) + '%' : '—';
+      const color = e.extraction_confidence < 0.3 ? '#ef4444' : '#f59e0b';
+      html += `<tr><td><code style="font-family:var(--da-font-mono);font-size:11px;">${e.entity_type}</code></td>`;
+      html += `<td><strong>${e.canonical_name}</strong></td>`;
+      html += `<td style="color:${color};font-weight:600;">${pct}</td>`;
+      html += `<td style="font-size:12px;color:var(--da-text-3);">${e.source_file || '—'}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (e) {
+    console.error("Failed to load low confidence entities:", e);
+    container.innerHTML = '<div class="da-empty"><p>Error loading low-confidence entities</p></div>';
+  }
+}
+
+// ── Ontology Admin ──────────────────────────────────────────────────────────
+let ontologyTypesCache = [];
+
+async function loadOntologyAdmin() {
+  await loadOntologyTypes();
+  await loadOntologyFkRules();
+}
+
+async function loadOntologyTypes() {
+  const container = document.getElementById("ontology-types-table");
+  try {
+    const res = await fetch(`${API}/admin/ontology/types`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      container.innerHTML = '<div class="da-empty"><p>Failed to load entity types</p></div>';
+      return;
+    }
+
+    ontologyTypesCache = data.types || [];
+
+    if (ontologyTypesCache.length === 0) {
+      container.innerHTML = '<div class="da-empty"><p>No entity types defined yet.</p></div>';
+      return;
+    }
+
+    let html = '<table class="da-table"><thead><tr>';
+    html += '<th>Color</th><th>Icon</th><th>Label</th><th>Name</th><th>Active</th><th>Sort</th><th>Entity Table</th><th>Resolvable</th><th>Actions</th>';
+    html += '</tr></thead><tbody>';
+
+    ontologyTypesCache.forEach(type => {
+      html += '<tr>';
+      html += `<td><div style="width:24px;height:24px;background:${type.display_color};border-radius:4px;"></div></td>`;
+      html += `<td style="font-size:18px;">${type.icon || ''}</td>`;
+      html += `<td><strong>${type.display_label}</strong></td>`;
+      html += `<td><code style="font-family:var(--da-font-mono);font-size:11px;color:var(--da-text-2);">${type.name}</code></td>`;
+      html += `<td><input type="checkbox" ${type.is_active ? 'checked' : ''} onchange="toggleTypeActive(${type.id}, this.checked)"></td>`;
+      html += `<td>${type.sort_order}</td>`;
+      html += `<td>${type.is_entity_table ? '✓' : '—'}</td>`;
+      html += `<td>${type.is_resolvable ? '✓' : '—'}</td>`;
+      html += `<td style="white-space:nowrap;">`;
+      html += `<button class="da-btn da-btn-ghost da-btn-sm" onclick="openEditTypeModal(${type.id})" style="padding:4px 10px;margin-right:4px;">Edit</button>`;
+      html += `<button class="da-btn da-btn-danger da-btn-sm" onclick="deleteOntologyType(${type.id})" style="padding:4px 10px;">Delete</button>`;
+      html += `</td>`;
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (e) {
+    console.error("Failed to load ontology types:", e);
+    container.innerHTML = '<div class="da-empty"><p>Error loading entity types</p></div>';
+  }
+}
+
+async function loadOntologyFkRules() {
+  const container = document.getElementById("ontology-fk-rules-table");
+  try {
+    const res = await fetch(`${API}/admin/ontology/fk-rules`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      container.innerHTML = '<div class="da-empty"><p>Failed to load FK rules</p></div>';
+      return;
+    }
+
+    const rules = data.rules || [];
+
+    if (rules.length === 0) {
+      container.innerHTML = '<div class="da-empty"><p>No FK rules defined yet.</p></div>';
+      return;
+    }
+
+    let html = '<table class="da-table"><thead><tr>';
+    html += '<th>Child Type</th><th>Parent Type</th><th>Column Name</th><th>Active</th><th>Actions</th>';
+    html += '</tr></thead><tbody>';
+
+    rules.forEach(rule => {
+      html += '<tr>';
+      html += `<td><strong>${rule.child_name}</strong></td>`;
+      html += `<td><strong>${rule.parent_name}</strong></td>`;
+      html += `<td><code style="font-family:var(--da-font-mono);font-size:11px;">${rule.column_name}</code></td>`;
+      html += `<td>${rule.is_active ? '<span class="da-badge-active">Active</span>' : '<span class="da-badge-error">Inactive</span>'}</td>`;
+      html += `<td><button class="da-btn da-btn-danger da-btn-sm" onclick="deleteOntologyFkRule(${rule.id})" style="padding:4px 10px;">Delete</button></td>`;
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (e) {
+    console.error("Failed to load FK rules:", e);
+    container.innerHTML = '<div class="da-empty"><p>Error loading FK rules</p></div>';
+  }
+}
+
+async function toggleTypeActive(typeId, isActive) {
+  try {
+    const res = await fetch(`${API}/admin/ontology/types/${typeId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: isActive }),
+    });
+
+    if (!res.ok) {
+      alert("Failed to update type");
+      loadOntologyTypes(); // Reload to reset checkbox
+    } else {
+      alert("Type updated successfully");
+    }
+  } catch (e) {
+    console.error("Failed to toggle type active:", e);
+    alert("Error updating type");
+    loadOntologyTypes();
+  }
+}
+
+async function deleteOntologyType(typeId) {
+  if (!confirm("Are you sure you want to deactivate this entity type? This is a soft delete.")) return;
+
+  try {
+    const res = await fetch(`${API}/admin/ontology/types/${typeId}`, {
+      method: "DELETE",
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.detail || "Failed to delete type");
+    } else {
+      alert("Entity type deactivated successfully");
+      loadOntologyTypes();
+    }
+  } catch (e) {
+    console.error("Failed to delete type:", e);
+    alert("Error deleting type");
+  }
+}
+
+async function deleteOntologyFkRule(ruleId) {
+  if (!confirm("Are you sure you want to delete this FK rule?")) return;
+
+  try {
+    const res = await fetch(`${API}/admin/ontology/fk-rules/${ruleId}`, {
+      method: "DELETE",
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.detail || "Failed to delete FK rule");
+    } else {
+      alert("FK rule deleted successfully");
+      loadOntologyFkRules();
+    }
+  } catch (e) {
+    console.error("Failed to delete FK rule:", e);
+    alert("Error deleting FK rule");
+  }
+}
+
+async function refreshOntologyCache() {
+  try {
+    const res = await fetch(`${API}/admin/ontology/invalidate-cache`, {
+      method: "POST",
+    });
+
+    if (!res.ok) {
+      alert("Failed to refresh cache");
+    } else {
+      alert("Cache refreshed successfully");
+    }
+  } catch (e) {
+    console.error("Failed to refresh cache:", e);
+    alert("Error refreshing cache");
+  }
+}
+
+// Modal functions
+function openAddTypeModal() {
+  document.getElementById("ontology-type-modal-title").textContent = "Add Entity Type";
+  document.getElementById("ontology-type-name").value = "";
+  document.getElementById("ontology-type-name").disabled = false;
+  document.getElementById("ontology-type-display-label").value = "";
+  document.getElementById("ontology-type-color").value = "#6b6b7a";
+  document.getElementById("ontology-type-icon").value = "";
+  document.getElementById("ontology-type-description").value = "";
+  document.getElementById("ontology-type-examples").value = "";
+  document.getElementById("ontology-type-is-entity-table").checked = true;
+  document.getElementById("ontology-type-is-resolvable").checked = true;
+  document.getElementById("ontology-type-sort-order").value = "0";
+
+  document.getElementById("ontology-type-submit-btn").onclick = submitOntologyType;
+  document.getElementById("ontology-type-submit-btn").dataset.typeId = "";
+
+  document.getElementById("ontology-type-modal-backdrop").style.display = "flex";
+}
+
+function openEditTypeModal(typeId) {
+  const type = ontologyTypesCache.find(t => t.id === typeId);
+  if (!type) return;
+
+  document.getElementById("ontology-type-modal-title").textContent = "Edit Entity Type";
+  document.getElementById("ontology-type-name").value = type.name;
+  document.getElementById("ontology-type-name").disabled = true; // Can't rename
+  document.getElementById("ontology-type-display-label").value = type.display_label;
+  document.getElementById("ontology-type-color").value = type.display_color;
+  document.getElementById("ontology-type-icon").value = type.icon || "";
+  document.getElementById("ontology-type-description").value = type.description || "";
+  document.getElementById("ontology-type-examples").value = type.classification_examples || "";
+  document.getElementById("ontology-type-is-entity-table").checked = type.is_entity_table;
+  document.getElementById("ontology-type-is-resolvable").checked = type.is_resolvable;
+  document.getElementById("ontology-type-sort-order").value = type.sort_order;
+
+  document.getElementById("ontology-type-submit-btn").onclick = submitOntologyType;
+  document.getElementById("ontology-type-submit-btn").dataset.typeId = typeId;
+
+  document.getElementById("ontology-type-modal-backdrop").style.display = "flex";
+}
+
+function closeOntologyTypeModal() {
+  document.getElementById("ontology-type-modal-backdrop").style.display = "none";
+}
+
+async function submitOntologyType() {
+  const typeId = document.getElementById("ontology-type-submit-btn").dataset.typeId;
+  const isEdit = !!typeId;
+
+  const name = document.getElementById("ontology-type-name").value.trim();
+  const displayLabel = document.getElementById("ontology-type-display-label").value.trim();
+  const color = document.getElementById("ontology-type-color").value;
+  const icon = document.getElementById("ontology-type-icon").value.trim();
+  const description = document.getElementById("ontology-type-description").value.trim();
+  const examples = document.getElementById("ontology-type-examples").value.trim();
+  const isEntityTable = document.getElementById("ontology-type-is-entity-table").checked;
+  const isResolvable = document.getElementById("ontology-type-is-resolvable").checked;
+  const sortOrder = parseInt(document.getElementById("ontology-type-sort-order").value);
+
+  if (!isEdit && !name) {
+    alert("Name is required");
+    return;
+  }
+  if (!displayLabel) {
+    alert("Display label is required");
+    return;
+  }
+
+  const body = isEdit ? {
+    display_label: displayLabel,
+    display_color: color,
+    icon: icon || null,
+    description: description || null,
+    classification_examples: examples || null,
+    is_entity_table: isEntityTable,
+    is_resolvable: isResolvable,
+    sort_order: sortOrder,
+  } : {
+    name: name.toLowerCase(),
+    display_label: displayLabel,
+    display_color: color,
+    icon: icon || null,
+    description: description || null,
+    classification_examples: examples || null,
+    is_entity_table: isEntityTable,
+    is_resolvable: isResolvable,
+    sort_order: sortOrder,
+  };
+
+  try {
+    const url = isEdit ? `${API}/admin/ontology/types/${typeId}` : `${API}/admin/ontology/types`;
+    const method = isEdit ? "PUT" : "POST";
+
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.detail || "Failed to save entity type");
+      return;
+    }
+
+    alert(isEdit ? "Entity type updated successfully" : "Entity type created successfully");
+    closeOntologyTypeModal();
+    loadOntologyTypes();
+  } catch (e) {
+    console.error("Failed to save type:", e);
+    alert("Error saving entity type");
+  }
+}
+
+function openAddFkRuleModal() {
+  // Populate dropdowns with types
+  const childSelect = document.getElementById("ontology-fk-child-type");
+  const parentSelect = document.getElementById("ontology-fk-parent-type");
+
+  childSelect.innerHTML = '<option value="">Select child type...</option>';
+  parentSelect.innerHTML = '<option value="">Select parent type...</option>';
+
+  ontologyTypesCache.forEach(type => {
+    childSelect.innerHTML += `<option value="${type.id}">${type.display_label}</option>`;
+    parentSelect.innerHTML += `<option value="${type.id}">${type.display_label}</option>`;
+  });
+
+  document.getElementById("ontology-fk-column").value = "";
+  document.getElementById("ontology-fk-modal-backdrop").style.display = "flex";
+}
+
+function closeOntologyFkModal() {
+  document.getElementById("ontology-fk-modal-backdrop").style.display = "none";
+}
+
+async function submitOntologyFkRule() {
+  const childTypeId = parseInt(document.getElementById("ontology-fk-child-type").value);
+  const parentTypeId = parseInt(document.getElementById("ontology-fk-parent-type").value);
+  const columnName = document.getElementById("ontology-fk-column").value.trim();
+
+  if (!childTypeId || !parentTypeId) {
+    alert("Please select both child and parent types");
+    return;
+  }
+  if (!columnName) {
+    alert("Column name is required");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/admin/ontology/fk-rules`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        child_type_id: childTypeId,
+        parent_type_id: parentTypeId,
+        column_name: columnName,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.detail || "Failed to create FK rule");
+      return;
+    }
+
+    alert("FK rule created successfully");
+    closeOntologyFkModal();
+    loadOntologyFkRules();
+  } catch (e) {
+    console.error("Failed to create FK rule:", e);
+    alert("Error creating FK rule");
+  }
+}
+
+function openAddAttributeModal(typeId) {
+  document.getElementById("ontology-attr-name").value = "";
+  document.getElementById("ontology-attr-description").value = "";
+  document.getElementById("ontology-attr-sql-type").value = "";
+  document.getElementById("ontology-attr-is-key").checked = false;
+  document.getElementById("ontology-attr-sort-order").value = "0";
+
+  document.getElementById("ontology-attr-modal-backdrop").dataset.typeId = typeId;
+  document.getElementById("ontology-attr-modal-backdrop").style.display = "flex";
+}
+
+function closeOntologyAttrModal() {
+  document.getElementById("ontology-attr-modal-backdrop").style.display = "none";
+}
+
+async function submitOntologyAttribute() {
+  const typeId = document.getElementById("ontology-attr-modal-backdrop").dataset.typeId;
+  const attrName = document.getElementById("ontology-attr-name").value.trim();
+  const description = document.getElementById("ontology-attr-description").value.trim();
+  const sqlType = document.getElementById("ontology-attr-sql-type").value.trim();
+  const isKey = document.getElementById("ontology-attr-is-key").checked;
+  const sortOrder = parseInt(document.getElementById("ontology-attr-sort-order").value);
+
+  if (!attrName) {
+    alert("Attribute name is required");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/admin/ontology/types/${typeId}/attributes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        attribute_name: attrName,
+        description: description || null,
+        is_key_attribute: isKey,
+        sql_type_hint: sqlType || null,
+        sort_order: sortOrder,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.detail || "Failed to add attribute");
+      return;
+    }
+
+    alert("Attribute added successfully");
+    closeOntologyAttrModal();
+    // Optionally reload types to show new attribute count
+    loadOntologyTypes();
+  } catch (e) {
+    console.error("Failed to add attribute:", e);
+    alert("Error adding attribute");
   }
 }
 </script>

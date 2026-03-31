@@ -51,8 +51,12 @@ EMBEDDING_DIMENSION: int = int(os.getenv("DATAARCH_EMBEDDING_DIM", "1024"))
 # ── Application ──────────────────────────────────────────────────────────────
 
 DATAARCH_ENV: str = os.getenv("DATAARCH_ENV", "dev")
-APP_VERSION: str = "1.0.0-alpha"
+APP_VERSION: str = "1.0.0-beta"
 APP_NAME: str = "DataArch.AI"
+
+# ── Error Monitoring ──────────────────────────────────────────────────────
+SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
+SENTRY_TRACES_SAMPLE_RATE: float = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1"))
 
 # ── Authentication ──────────────────────────────────────────────────────────
 

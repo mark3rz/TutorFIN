@@ -296,10 +296,16 @@ def _upsert_entity(
         columns["company_id"] = company_id
 
     # Transform each attribute
+    extraction_confidence_value = None
     for attr_key, attr_val in record.attributes.items():
+        # Special handling for _extraction_confidence (preserved from LLM)
+        if attr_key == "_extraction_confidence":
+            extraction_confidence_value = attr_val
+            continue
+
         col_name = _sanitize_column_name(attr_key)
         if col_name in ("id", "canonical_name", "company_id",
-                         "created_at", "updated_at", "source_file"):
+                         "created_at", "updated_at", "source_file", "extraction_confidence"):
             continue
         if col_name not in col_types:
             continue  # Column not in schema — skip
@@ -312,6 +318,21 @@ def _upsert_entity(
     # Add source_file
     if "source_file" in col_types:
         columns["source_file"] = record.source_file
+
+    # Add extraction_confidence (original LLM confidence 0.0-1.0)
+    if "extraction_confidence" in col_types:
+        if extraction_confidence_value is not None:
+            # Use the preserved numeric confidence from LLM extraction
+            columns["extraction_confidence"] = float(extraction_confidence_value)
+        else:
+            # Fallback: convert mapping confidence to numeric if LLM confidence not available
+            confidence_map = {
+                "high": 0.90,
+                "medium": 0.75,
+                "low": 0.50,
+            }
+            confidence_value = confidence_map.get(record.confidence.value.lower(), 0.50)
+            columns["extraction_confidence"] = confidence_value
 
     if not columns:
         return

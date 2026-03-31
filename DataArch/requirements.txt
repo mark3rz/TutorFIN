@@ -27,6 +27,8 @@ boto3>=1.34.0             # S3 storage backend (optional — only needed when ST
 # Data modeling & utilities
 pydantic>=2.9.0
 python-dotenv>=1.0.1
+python-json-logger>=2.0.7    # Structured JSON logging
+sentry-sdk[fastapi]>=2.0.0   # Error monitoring (optional — only active when SENTRY_DSN is set)
 
 # Auth & Security
 python-jose[cryptography]>=3.3.0   # JWT tokens

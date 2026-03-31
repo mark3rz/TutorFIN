@@ -361,6 +361,10 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
         persist_job_completed,
         persist_step_update,
     )
+    from services.logging_config import set_job_context
+
+    # Set job_id in logging context so all pipeline logs include it
+    set_job_context(job.job_id)
 
     job.status = "running"
     job.started_at = _now()
@@ -532,6 +536,13 @@ def _execute_pipeline(job: PipelineJob, file_path: Path, skip_embed: bool):
         job.status = "failed"
         job.error = str(e)
         logger.error(f"[{job.job_id}] Pipeline failed: {e}")
+
+        # Report to Sentry if configured
+        try:
+            import sentry_sdk
+            sentry_sdk.capture_exception(e)
+        except ImportError:
+            pass
 
         # Persist failure to DB even on unexpected exception
         persist_job_completed(

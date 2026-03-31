@@ -18,6 +18,7 @@ Route modules:
 """
 
 import logging
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -43,6 +44,22 @@ log = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Startup and shutdown events for the FastAPI app."""
     # ── Startup ────────────────────────────────────────────────────
+    # Configure structured logging first (before any log lines)
+    from services.logging_config import setup_logging
+    setup_logging()
+
+    # Initialize Sentry error monitoring (no-op when SENTRY_DSN is empty)
+    if config.SENTRY_DSN:
+        import sentry_sdk
+        sentry_sdk.init(
+            dsn=config.SENTRY_DSN,
+            environment=config.DATAARCH_ENV,
+            release=f"dataarch@{config.APP_VERSION}",
+            traces_sample_rate=config.SENTRY_TRACES_SAMPLE_RATE,
+            send_default_pii=False,
+        )
+        log.info("Sentry error monitoring initialized (env=%s)", config.DATAARCH_ENV)
+
     log.info("DataArch.AI %s starting up ...", config.APP_VERSION)
 
     # Warm the ontology cache from DB (or fallback)
@@ -81,6 +98,57 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Correlation ID Middleware ──────────────────────────────────────────────
+
+@app.middleware("http")
+async def correlation_id_middleware(request: Request, call_next):
+    """
+    Generate or extract correlation_id for each request.
+
+    - Reads X-Correlation-ID header if present, otherwise generates a new UUID4
+    - Injects correlation_id, user_id, company_id into logging context
+    - Adds X-Correlation-ID response header for request tracing
+    """
+    from services.logging_config import set_log_context
+
+    # Get or generate correlation ID
+    correlation_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
+
+    # Extract user/company context from auth token (if available)
+    user_id = None
+    company_id = None
+    try:
+        from auth import get_optional_user
+        user = get_optional_user(request)
+        if user:
+            user_id = user.id
+            company_id = user.company_id
+    except Exception:
+        # Auth not available or failed — continue without user context
+        pass
+
+    # Set logging context for this request
+    set_log_context(
+        correlation_id=correlation_id,
+        user_id=user_id,
+        company_id=company_id,
+    )
+
+    # Enrich Sentry scope with user/request context
+    if config.SENTRY_DSN:
+        import sentry_sdk
+        sentry_sdk.set_tag("correlation_id", correlation_id)
+        if user_id:
+            sentry_sdk.set_user({"id": user_id, "company_id": company_id})
+
+    # Process request
+    response = await call_next(request)
+
+    # Add correlation ID to response headers
+    response.headers["X-Correlation-ID"] = correlation_id
+
+    return response
+
 # ── Include Routers ────────────────────────────────────────────────────────
 
 from routes.auth import router as auth_router
@@ -94,6 +162,7 @@ from routes.ai import router as ai_router
 from routes.portfolio import router as portfolio_router
 from routes.entities import router as entities_router
 from routes.admin import router as admin_router
+from routes.confidence import router as confidence_router
 
 app.include_router(auth_router)
 app.include_router(ingest_router)
@@ -106,6 +175,7 @@ app.include_router(ai_router)
 app.include_router(portfolio_router)
 app.include_router(entities_router)
 app.include_router(admin_router)
+app.include_router(confidence_router)
 
 # ── Static Files & Frontend ────────────────────────────────────────────────
 
