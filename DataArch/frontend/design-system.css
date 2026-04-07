@@ -248,6 +248,13 @@ a:hover { text-decoration: underline; }
   display: block;
 }
 
+#view-invite.active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+}
+
 /* Full-bleed views override max-width */
 .da-view-fullbleed {
   max-width: none;
