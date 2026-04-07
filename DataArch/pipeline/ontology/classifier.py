@@ -1,0 +1,213 @@
+"""
+pipeline/ontology/classifier.py — LLM-powered entity → ontology type mapper.
+
+Takes a BusinessEntity from a ParsedDocument and asks Claude to classify it
+into the PE business ontology, extracting normalised attributes in the process.
+
+Phase 1 improvements:
+  - Structured output via Claude tool_use (not free-text JSON)
+  - Pydantic validation of classification response
+  - Uses retry wrapper from pipeline.llm
+"""
+
+import json
+import logging
+from typing import Any
+
+from pydantic import BaseModel, Field, ValidationError
+
+from pipeline.ontology.schema import OntologyType, MappingConfidence
+
+logger = logging.getLogger(__name__)
+
+# ── Dynamic ontology spec and tool (loaded from DB via ontology_service) ──────
+
+def _get_ontology_spec() -> str:
+    """Build ONTOLOGY_SPEC dynamically from the database."""
+    from services.ontology_service import get_classification_spec
+    return get_classification_spec()
+
+
+def _get_classification_tool() -> dict:
+    """Build CLASSIFICATION_TOOL dynamically from the database."""
+    from services.ontology_service import get_classification_tool_enum
+    return {
+        "name": "classify_business_entity",
+        "description": (
+            "Classify a business entity into the PE business ontology. "
+            "Determine the entity type, confidence level, and extract normalised attributes."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ontology_type": {
+                    "type": "string",
+                    "enum": get_classification_tool_enum(),
+                    "description": "The PE ontology type this entity belongs to.",
+                },
+                "confidence": {
+                    "type": "string",
+                    "enum": ["high", "medium", "low"],
+                    "description": "How confident you are in this classification.",
+                },
+                "canonical_name": {
+                    "type": "string",
+                    "description": "Clean, normalised name for this entity (e.g. 'Acme Corporation', not 'ACME CORP.').",
+                },
+                "aliases": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Other names this entity goes by. Include the original raw name if it differs from canonical_name.",
+                },
+                "attributes": {
+                    "type": "object",
+                    "description": "Type-specific key-value attributes using the key names from the ontology spec.",
+                    "additionalProperties": {"type": "string"},
+                },
+                "mapping_notes": {
+                    "type": "string",
+                    "description": "One sentence explaining why you chose this type, or noting any ambiguity.",
+                },
+            },
+            "required": ["ontology_type", "confidence", "canonical_name", "attributes"],
+        },
+    }
+
+
+# ── Pydantic model for validated classification ──────────────────────────────
+
+class ClassificationResult(BaseModel):
+    """Validated classification result from the LLM."""
+    ontology_type: str
+    confidence: str
+    canonical_name: str
+    aliases: list[str] = Field(default_factory=list)
+    attributes: dict[str, Any] = Field(default_factory=dict)
+    mapping_notes: str = ""
+
+
+# ── Classification system prompt ─────────────────────────────────────────────
+
+def _get_classification_system() -> str:
+    """Build the classification system prompt dynamically."""
+    spec = _get_ontology_spec()
+    return f"""You are a data architecture expert classifying business entities
+into a Private Equity business ontology.
+
+{spec}
+
+Rules:
+- canonical_name should be a clean, deduplicated name (e.g. 'Acme Corporation', not 'ACME CORP.')
+- aliases should include the original raw name if it differs from canonical_name
+- attributes should use the key names listed in the ontology spec for the chosen type
+- Only include attributes that are actually present in the source data
+- Use the classify_business_entity tool to return your classification."""
+
+
+def classify_entity(
+    entity_type: str,
+    entity_name: str | None,
+    entity_attributes: dict,
+    llm_client,
+) -> dict:
+    """
+    Ask Claude to classify a single entity into the PE ontology using tool_use.
+    Returns the parsed classification dict.
+    """
+    from pipeline.llm import MODEL, _call_with_retry
+
+    user_message = (
+        f"Classify this business entity into the PE ontology:\n\n"
+        f"Type: {entity_type}\n"
+        f"Name: {entity_name or '(unnamed)'}\n"
+        f"Attributes: {json.dumps(entity_attributes, indent=2)}"
+    )
+
+    classification_system = _get_classification_system()
+    classification_tool = _get_classification_tool()
+
+    def _make_call():
+        return llm_client.messages.create(
+            model=MODEL,
+            max_tokens=800,
+            system=classification_system,
+            tools=[classification_tool],
+            tool_choice={"type": "tool", "name": "classify_business_entity"},
+            messages=[{"role": "user", "content": user_message}],
+        )
+
+    message = _call_with_retry(_make_call)
+
+    # Parse tool_use response
+    for block in message.content:
+        if block.type == "tool_use" and block.name == "classify_business_entity":
+            try:
+                validated = ClassificationResult(**block.input)
+                return validated.model_dump()
+            except ValidationError as e:
+                logger.warning(f"Classification validation failed: {e}. Using raw data.")
+                return block.input
+
+    # Fallback: try to parse text response
+    logger.warning("No tool_use block in classification response, trying text fallback.")
+    return _classify_text_fallback(message, entity_name)
+
+
+def _classify_text_fallback(message, entity_name: str | None) -> dict:
+    """
+    Fallback parser for when Claude doesn't use the tool.
+    """
+    for block in message.content:
+        if hasattr(block, "text"):
+            text = block.text.strip()
+            if text.startswith("```"):
+                lines = text.split("\n")
+                text = "\n".join(lines[1:-1])
+            try:
+                data = json.loads(text)
+                return data
+            except json.JSONDecodeError:
+                pass
+
+    # Return unknown classification if all parsing fails
+    logger.error(f"Could not parse classification for '{entity_name}'. Returning UNKNOWN.")
+    return {
+        "ontology_type": "unknown",
+        "confidence": "low",
+        "canonical_name": entity_name or "unnamed",
+        "aliases": [],
+        "attributes": {},
+        "mapping_notes": "Classification failed — could not parse LLM response.",
+    }
+
+
+def confidence_from_str(s: str) -> MappingConfidence:
+    mapping = {
+        "high": MappingConfidence.HIGH,
+        "medium": MappingConfidence.MEDIUM,
+        "low": MappingConfidence.LOW,
+    }
+    return mapping.get(s.lower(), MappingConfidence.LOW)
+
+
+def ontology_type_from_str(s: str) -> OntologyType:
+    """
+    Convert a string to an OntologyType, returning UNKNOWN for unrecognised values.
+
+    Note: OntologyType._missing_ allows any string to be used as a dynamic enum
+    value (so DB-defined types work at runtime). We must therefore validate against
+    the set of known types explicitly rather than relying on ValueError.
+    """
+    normalised = s.lower().strip()
+    # Check static enum members first (always valid)
+    for member in OntologyType.__members__.values():
+        if member.value == normalised:
+            return member
+    # Check DB-backed types via the ontology service
+    try:
+        from services.ontology_service import get_type_names
+        if normalised in get_type_names():
+            return OntologyType(normalised)
+    except Exception:
+        pass
+    return OntologyType.UNKNOWN

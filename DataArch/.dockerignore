@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.git/
+.gitignore
+Scaffold/
+Scaffold2/
+DataArch_Build_Tracker.docx
+*.md

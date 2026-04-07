@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataArch.AI — Data Flow Map</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Epilogue:wght@700;900&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #0f0e17;
+    color: #e0e0e0;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #graph-container { width: 100vw; height: 100vh; position: relative; }
+
+  svg { width: 100%; height: 100%; }
+
+  .link { stroke-opacity: 0.4; fill: none; }
+  .link-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    fill: #6b6b7a;
+    pointer-events: none;
+  }
+
+  .node-circle {
+    cursor: pointer;
+    stroke-width: 2px;
+    transition: r 0.2s;
+    filter: drop-shadow(0 0 8px rgba(255,255,255,0.08));
+  }
+  .node-circle:hover {
+    stroke-width: 3px;
+    filter: drop-shadow(0 0 16px rgba(255,255,255,0.15));
+  }
+
+  .node-label {
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    fill: #ffffff;
+    pointer-events: none;
+    text-anchor: middle;
+  }
+  .node-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    fill: #ababb8;
+    pointer-events: none;
+    text-anchor: middle;
+  }
+
+  /* Sidebar panel */
+  #sidebar {
+    position: fixed; top: 0; right: -420px; width: 420px; height: 100vh;
+    background: #ffffff; border-left: 1px solid #ebebec; padding: 28px;
+    overflow-y: auto; transition: right 0.3s ease; z-index: 100;
+    color: #0f0e17;
+  }
+  #sidebar.open { right: 0; }
+  #sidebar-close {
+    position: absolute; top: 16px; right: 16px; background: none; border: none;
+    color: #ababb8; font-size: 20px; cursor: pointer;
+  }
+  #sidebar-close:hover { color: #0f0e17; }
+  #sidebar h2 {
+    font-family: 'Epilogue', sans-serif;
+    font-size: 20px;
+    font-weight: 900;
+    margin-bottom: 4px;
+    color: #0f0e17;
+    letter-spacing: -0.02em;
+  }
+  #sidebar .type-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; font-weight: 500; color: #fff;
+    margin-bottom: 16px; text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  #sidebar .stat {
+    font-family: 'Epilogue', sans-serif;
+    font-size: 36px;
+    font-weight: 900;
+    color: #0f0e17;
+    margin-bottom: 4px;
+    letter-spacing: -0.03em;
+  }
+  #sidebar .stat-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #ababb8;
+    margin-bottom: 20px;
+  }
+
+  .entity-card {
+    background: #f7f7f8; border: 1px solid #ebebec; border-radius: 10px;
+    padding: 14px; margin-bottom: 8px;
+  }
+  .entity-card h4 {
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #0f0e17;
+  }
+  .entity-card .meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: #6b6b7a;
+  }
+  .entity-card .confidence {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .confidence-high   { background: #f0fdf4; color: #16a34a; }
+  .confidence-medium { background: #fffbeb; color: #d97706; }
+  .confidence-low    { background: #fef2f2; color: #dc2626; }
+
+  .entity-attrs { margin-top: 8px; }
+  .entity-attrs dt {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: #ababb8;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .entity-attrs dd {
+    font-size: 13px;
+    color: #0f0e17;
+    margin-left: 0;
+  }
+
+  /* Header overlay */
+  #header {
+    position: fixed; top: 20px; left: 20px; z-index: 50;
+  }
+  #header h1 {
+    font-family: 'Epilogue', sans-serif;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+  }
+  #header h1 span { color: #2563eb; }
+  #header .subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: #6b6b7a;
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  /* Stats overlay */
+  #stats-bar {
+    position: fixed; bottom: 20px; left: 20px; z-index: 50;
+    display: flex; gap: 12px;
+  }
+  .stat-chip {
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: #ababb8;
+  }
+  .stat-chip strong { color: #2563eb; }
+
+  /* Legend */
+  #legend {
+    position: fixed; bottom: 20px; right: 20px; z-index: 50;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 14px 18px;
+  }
+  #legend h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: #6b6b7a;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 12px;
+    color: #e0e0e0;
+  }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* Empty state */
+  #empty-state {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; z-index: 50; display: none;
+  }
+  #empty-state h2 {
+    font-family: 'Epilogue', sans-serif;
+    font-size: 28px;
+    font-weight: 900;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+  #empty-state p {
+    font-size: 14px;
+    color: #6b6b7a;
+    max-width: 400px;
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>DataArch<span>.AI</span></h1>
+  <div class="subtitle">Data Flow Map</div>
+</div>
+
+<div id="stats-bar">
+  <div class="stat-chip"><strong id="stat-types">0</strong>&nbsp;entity types</div>
+  <div class="stat-chip"><strong id="stat-entities">0</strong>&nbsp;total entities</div>
+  <div class="stat-chip"><strong id="stat-rels">0</strong>&nbsp;relationships</div>
+</div>
+
+<div id="legend"></div>
+
+<div id="empty-state">
+  <h2>No data flow yet</h2>
+  <p>Ingest documents, run the ontology mapper, and generate a schema first. Then refresh this page.</p>
+</div>
+
+<div id="graph-container">
+  <svg id="graph-svg"></svg>
+</div>
+
+<div id="sidebar">
+  <button id="sidebar-close">&times;</button>
+  <div id="sidebar-content"></div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+
+// Updated color palette for entity types
+const DA_COLORS = {
+  vendor:           '#2563eb',
+  customer:         '#7c3aed',
+  employee:         '#16a34a',
+  product:          '#a21caf',
+  transaction:      '#d97706',
+  contract:         '#475569',
+  financial_record: '#c2410c',
+  business_unit:    '#0d9488',
+};
+
+async function fetchGraph() {
+  try {
+    const res = await fetch(`${API_BASE}/dataflow`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    console.warn("Could not fetch /dataflow, trying /dataflow/graph...", e);
+    try {
+      const res2 = await fetch(`${API_BASE}/dataflow/graph`);
+      if (!res2.ok) throw new Error(`HTTP ${res2.status}`);
+      return await res2.json();
+    } catch (e2) {
+      console.error("Failed to load graph data:", e2);
+      return null;
+    }
+  }
+}
+
+function renderSidebar(node) {
+  const sidebar = document.getElementById("sidebar");
+  const content = document.getElementById("sidebar-content");
+
+  let html = `<h2>${node.label}</h2>`;
+  html += `<span class="type-badge" style="background:${node.color}">${node.id}</span>`;
+  html += `<div class="stat">${node.entity_count}</div>`;
+  html += `<div class="stat-label">Entities</div>`;
+
+  for (const entity of node.entities) {
+    const confClass = `confidence-${entity.confidence}`;
+    html += `<div class="entity-card">`;
+    html += `<h4>${entity.name} <span class="confidence ${confClass}">${entity.confidence}</span></h4>`;
+    html += `<div class="meta">Source: ${entity.source_file}</div>`;
+
+    if (entity.aliases && entity.aliases.length > 0) {
+      html += `<div class="meta">Aliases: ${entity.aliases.join(", ")}</div>`;
+    }
+
+    if (entity.attributes && Object.keys(entity.attributes).length > 0) {
+      html += `<dl class="entity-attrs">`;
+      for (const [k, v] of Object.entries(entity.attributes)) {
+        html += `<dt>${k}</dt><dd>${v}</dd>`;
+      }
+      html += `</dl>`;
+    }
+    html += `</div>`;
+  }
+
+  content.innerHTML = html;
+  sidebar.classList.add("open");
+}
+
+function closeSidebar() {
+  document.getElementById("sidebar").classList.remove("open");
+}
+
+function renderLegend(nodes) {
+  const legend = document.getElementById("legend");
+  let html = `<h3>Entity Types</h3>`;
+  for (const n of nodes) {
+    html += `<div class="legend-item"><span class="legend-dot" style="background:${n.color}"></span>${n.label}</div>`;
+  }
+  legend.innerHTML = html;
+}
+
+function renderGraph(data) {
+  if (!data || !data.nodes || data.nodes.length === 0) {
+    document.getElementById("empty-state").style.display = "block";
+    document.getElementById("stats-bar").style.display = "none";
+    document.getElementById("legend").style.display = "none";
+    return;
+  }
+
+  // Apply new color palette to nodes
+  for (const node of data.nodes) {
+    if (DA_COLORS[node.id]) {
+      node.color = DA_COLORS[node.id];
+    }
+  }
+
+  // Update stats
+  document.getElementById("stat-types").textContent = data.stats.total_types;
+  document.getElementById("stat-entities").textContent = data.stats.total_entities;
+  document.getElementById("stat-rels").textContent = data.stats.total_relationships;
+
+  renderLegend(data.nodes);
+
+  const svg = d3.select("#graph-svg");
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+
+  svg.attr("viewBox", [0, 0, width, height]);
+
+  // Clear previous
+  svg.selectAll("*").remove();
+
+  // Defs for arrow markers and glow filter
+  const defs = svg.append("defs");
+  defs.append("marker")
+    .attr("id", "arrowhead")
+    .attr("viewBox", "0 -5 10 10")
+    .attr("refX", 28)
+    .attr("refY", 0)
+    .attr("markerWidth", 8)
+    .attr("markerHeight", 8)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M0,-5L10,0L0,5")
+    .attr("fill", "#3a3a4a");
+
+  // Glow filter for nodes
+  const glow = defs.append("filter")
+    .attr("id", "glow")
+    .attr("x", "-50%").attr("y", "-50%")
+    .attr("width", "200%").attr("height", "200%");
+  glow.append("feGaussianBlur")
+    .attr("stdDeviation", "4")
+    .attr("result", "coloredBlur");
+  const feMerge = glow.append("feMerge");
+  feMerge.append("feMergeNode").attr("in", "coloredBlur");
+  feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+  const g = svg.append("g");
+
+  // Zoom
+  const zoom = d3.zoom()
+    .scaleExtent([0.2, 4])
+    .on("zoom", (event) => g.attr("transform", event.transform));
+  svg.call(zoom);
+
+  // Size nodes by entity count
+  const maxCount = Math.max(...data.nodes.map(n => n.entity_count), 1);
+  const radiusScale = d3.scaleSqrt().domain([1, maxCount]).range([25, 55]);
+
+  // Force simulation
+  const simulation = d3.forceSimulation(data.nodes)
+    .force("link", d3.forceLink(data.edges).id(d => d.id).distance(200))
+    .force("charge", d3.forceManyBody().strength(-800))
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .force("collision", d3.forceCollide().radius(d => radiusScale(d.entity_count) + 20));
+
+  // Links
+  const link = g.selectAll(".link")
+    .data(data.edges)
+    .join("line")
+    .attr("class", "link")
+    .attr("stroke", "#2a2a3a")
+    .attr("stroke-width", 1.5)
+    .attr("marker-end", "url(#arrowhead)");
+
+  // Link labels
+  const linkLabel = g.selectAll(".link-label")
+    .data(data.edges)
+    .join("text")
+    .attr("class", "link-label")
+    .text(d => d.label);
+
+  // Node groups
+  const node = g.selectAll(".node")
+    .data(data.nodes)
+    .join("g")
+    .attr("class", "node")
+    .call(d3.drag()
+      .on("start", dragStarted)
+      .on("drag", dragged)
+      .on("end", dragEnded));
+
+  // Node circles with glow
+  node.append("circle")
+    .attr("class", "node-circle")
+    .attr("r", d => radiusScale(d.entity_count))
+    .attr("fill", d => d.color)
+    .attr("stroke", d => d3.color(d.color).brighter(0.8))
+    .attr("fill-opacity", 0.9)
+    .attr("filter", "url(#glow)")
+    .on("click", (event, d) => { event.stopPropagation(); renderSidebar(d); });
+
+  // Node labels
+  node.append("text")
+    .attr("class", "node-label")
+    .attr("dy", -4)
+    .text(d => d.label);
+
+  // Entity count
+  node.append("text")
+    .attr("class", "node-count")
+    .attr("dy", 12)
+    .text(d => `${d.entity_count} entities`);
+
+  // Tick
+  simulation.on("tick", () => {
+    link
+      .attr("x1", d => d.source.x)
+      .attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x)
+      .attr("y2", d => d.target.y);
+
+    linkLabel
+      .attr("x", d => (d.source.x + d.target.x) / 2)
+      .attr("y", d => (d.source.y + d.target.y) / 2);
+
+    node.attr("transform", d => `translate(${d.x},${d.y})`);
+  });
+
+  // Click background to close sidebar
+  svg.on("click", closeSidebar);
+
+  function dragStarted(event, d) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x; d.fy = d.y;
+  }
+  function dragged(event, d) {
+    d.fx = event.x; d.fy = event.y;
+  }
+  function dragEnded(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null; d.fy = null;
+  }
+}
+
+// Init
+document.getElementById("sidebar-close").addEventListener("click", closeSidebar);
+fetchGraph().then(renderGraph);
+</script>
+</body>
+</html>

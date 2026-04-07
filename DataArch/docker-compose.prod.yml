@@ -1,0 +1,64 @@
+# ──────────────────────────────────────────────────────────────
+# DataArch.AI — Production Docker Compose Override
+#
+# Extends docker-compose.yml for production deployments.
+# Uses an external managed Postgres instance instead of the
+# local `db` container.
+#
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Prerequisites:
+#   1. Set DATABASE_URL in your .env to your managed Postgres connection string
+#   2. Set DB_SSL_MODE=require in your .env
+#   3. Set JWT_SECRET to a long random secret (never use the default)
+#   4. Set ANTHROPIC_API_KEY (required)
+#   5. (Optional) Set VOYAGE_API_KEY for semantic search
+#
+# This file:
+#   - Removes the local `db` service
+#   - Adds SSL env var to the API container
+#   - Replaces the bind-mount on outputs/ with a named Docker volume
+#     (prevents data loss when the container is replaced)
+#   - Sets restart: always for unattended uptime
+# ──────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Disable local db in production ─────────────────────────
+  # DATABASE_URL in .env must point to your managed Postgres.
+  db:
+    deploy:
+      replicas: 0   # disables the local db service in production
+
+  # ── Production API overrides ──────────────────────────────
+  api:
+    restart: always
+    depends_on: {}          # remove dependency on local db
+    environment:
+      DATABASE_URL: ${DATABASE_URL}                   # must be set in .env
+      DB_SSL_MODE: ${DB_SSL_MODE:-require}            # enforce SSL in prod
+      DATAARCH_ENV: production
+      JWT_SECRET: ${JWT_SECRET}                       # must be a long random secret
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
+      DATAARCH_MODEL: ${DATAARCH_MODEL:-claude-sonnet-4-5-20250929}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://yourdomain.com}
+      # Storage
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_PREFIX: ${S3_PREFIX:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      # Invitations
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      FROM_EMAIL: ${FROM_EMAIL:-noreply@dataarch.ai}
+      APP_URL: ${APP_URL:-https://yourdomain.com}
+      OPEN_REGISTRATION: ${OPEN_REGISTRATION:-false}
+    volumes:
+      # Named volume keeps pipeline outputs across container replacements.
+      # For multi-instance deployments use STORAGE_BACKEND=s3 instead.
+      - dataarch-outputs:/app/outputs
+
+volumes:
+  dataarch-outputs:
+    driver: local
